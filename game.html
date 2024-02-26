@@ -15,10 +15,14 @@
     let score = 0;
     let player;
     let scoreLabel;
+    let levelLabel;
     let level = 0;
     let gameOverTextDisplayed = false;
     let gameStarted = false;
     let startButton = "";
+    let storedHighScore;
+    let highScoreText;
+    let highScoreLabel;
 
     const game = new Phaser.Game({
         type: Phaser.CANVAS,
@@ -39,14 +43,14 @@
     });
 
     function preload() {
-        this.load.image("background", "storage/images/background.jpg");
-        this.load.spritesheet("player", "storage/images/playersprite.png", {
+        this.load.image("background", "images/background.jpg");
+        this.load.spritesheet("player", "images/playersprite.png", {
             frameWidth: 655,
             frameHeight: 970
         });
-        this.load.image("coin", "storage/images/coin.png");
-        this.load.image("bomb", "storage/images/bomb.png");
-        this.load.image("meteor", "storage/images/meteor.png");
+        this.load.image("coin", "images/coin.png");
+        this.load.image("bomb", "images/bomb.png");
+        this.load.image("meteor", "images/meteor.png");
     }
 
     function create() {
@@ -70,6 +74,11 @@
             fill: "#ffffff"
         });
 
+        levelLabel = this.add.text(game.config.width - 10, 10, "Level: 0", {
+            fontSize: "24px",
+            fill: "#ffffff"
+        }).setOrigin(1, 0);
+
         startButton = this.add.text(game.config.width / 2, game.config.height / 2, "Start Game", {
             fontSize: "32px",
             fill: "#ffffff",
@@ -85,6 +94,14 @@
         startButton.setOrigin(0.5);
         startButton.setInteractive();
         startButton.on('pointerdown', startGame);
+
+        storedHighScore = localStorage.getItem('highscore');
+        highScoreText = storedHighScore !== null ? "High Score: " + storedHighScore : "High Score: 0";
+        highScoreLabel = this.add.text(game.config.width / 2, game.config.height / 2 + 50, highScoreText, {
+            fontSize: "24px",
+            fill: "#ffffff"
+        });
+        highScoreLabel.setOrigin(0.5);
 
         coins.children.iterate(function (child) {
             child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
@@ -118,7 +135,7 @@
         }
         if (coins.countActive() === 0) {
             level++;
-            scoreLabel.setText("Level " + level);
+            levelLabel.setText("Level: " + level);
 
             spawnCoins();
             spawnBombs();
@@ -143,8 +160,7 @@
         this.physics.world.collide(player, bombs, hitBomb, null, this);
         this.physics.world.collide(player, meteors, hitBomb, null, this);
 
-
-        if(level >= 1) {
+        if(level >= 4) {
             if(meteorStarter){
                 meteorTimer = this.time.addEvent({
                     delay: 2000, // A cada 10 segundos
@@ -161,6 +177,11 @@
         coin.disableBody(true, true);
         score += 10;
         scoreLabel.setText("Score: " + score);
+
+        // Verificar se o novo score é maior que o high score atual
+        if (score > storedHighScore) {
+            localStorage.setItem('highscore', score);
+        }
     }
 
     function hitBomb(player, bomb) {
@@ -185,12 +206,17 @@
                 gameStarted = false;
                 meteorStarter = true;
             }, [], game.scene.scenes[0]);
+
+            // Verificar se o novo score é maior que o high score atual
+            if (score > storedHighScore) {
+                localStorage.setItem('highscore', score);
+            }
         }
     }
 
     function spawnBombs() {
         bombs.clear(true, true);
-        const numBombs = 5 + (level - 1) * 2;
+        const numBombs = 3 + (level - 1) * 1;
 
         const playerSpawnX = player.x;
         const playerSpawnY = player.y;
@@ -216,7 +242,7 @@
 
     function spawnCoins() {
         coins.clear(true, true);
-        const numCoins = 10 + (level - 1);
+        const numCoins = 4 + (level - 1);
 
         for (let i = 0; i < numCoins; i++) {
             let coinX, coinY;
@@ -270,6 +296,7 @@
         player.setVisible(true);
         setupKeyboardEvents();
         this.setVisible(false);
+        highScoreLabel.setVisible(false);
     }
 
     function setupKeyboardEvents() {
@@ -328,6 +355,7 @@
         enterKey.on('down', function(event) {
             if (!gameStarted) {
                 startButton.setVisible(false);
+                highScoreLabel.setVisible(false);
                 startGame();
             }
         });
