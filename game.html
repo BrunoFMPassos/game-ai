@@ -9,6 +9,9 @@
 <script>
     let coins;
     let bombs;
+    let meteors;
+    let meteorTimer;
+    let meteorStarter = true;
     let score = 0;
     let player;
     let scoreLabel;
@@ -36,27 +39,31 @@
     });
 
     function preload() {
-        this.load.image("background", "images/background.jpg");
-        this.load.spritesheet("player", "images/playersprite.png", {
+        this.load.image("background", "storage/images/background.jpg");
+        this.load.spritesheet("player", "storage/images/playersprite.png", {
             frameWidth: 655,
             frameHeight: 970
         });
-        this.load.image("coin", "images/coin.png");
-        this.load.image("bomb", "images/bomb.png");
+        this.load.image("coin", "storage/images/coin.png");
+        this.load.image("bomb", "storage/images/bomb.png");
+        this.load.image("meteor", "storage/images/meteor.png");
     }
 
     function create() {
         const background = this.add.image(400, 300, "background");
-        //background.setOrigin(0, 0);
         background.setScale(game.config.width / background.width+0.03, game.config.height / background.height);
 
-        player = this.physics.add.sprite(game.config.width / 2, 200, "player");
+        const initialPlayerX = game.config.width / 2;
+        const initialPlayerY = game.config.height /2;
+
+        player = this.physics.add.sprite(initialPlayerX, initialPlayerY, "player");
         player.setBounce(0.2);
         player.setCollideWorldBounds(true);
         player.setScale(75 / player.width);
 
         coins = this.physics.add.group({ gravityY: 0 });
         bombs = this.physics.add.group({ gravityY: 0 });
+        meteors = this.physics.add.group({ gravityY: 0 });
 
         scoreLabel = this.add.text(10, 10, "Score: 0", {
             fontSize: "24px",
@@ -79,7 +86,6 @@
         startButton.setInteractive();
         startButton.on('pointerdown', startGame);
 
-        // Configurações de física para as moedas e bombas
         coins.children.iterate(function (child) {
             child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
         });
@@ -88,7 +94,6 @@
             child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
         });
 
-        // Carrega a animação do jogador
         this.anims.create({
             key: 'run',
             frames: this.anims.generateFrameNumbers('player', { start: 0, end: 5 }),
@@ -96,23 +101,20 @@
             repeat: -1
         });
 
-        // Inicia a animação do jogador
         player.play('run');
 
-        // Esconde o jogador inicialmente
         player.setVisible(false);
     }
 
 
     function update() {
         if (!gameStarted) return;
-        // Movimento lento de rotação para as bombas
         bombs.getChildren().forEach(bomb => {
-            bomb.angle += 0.5; // Altera o ângulo de rotação lentamente
+            bomb.angle += 0.5;
         });
 
         if (player.y >= 544) {
-            hitBomb(player,   null);
+            hitBomb(player, null);
         }
         if (coins.countActive() === 0) {
             level++;
@@ -122,30 +124,38 @@
             spawnBombs();
         }
 
-        // Movimento lateral aleatório para as bombas
         bombs.getChildren().forEach(bomb => {
-            // Define a direção horizontal aleatória se ainda não foi definida
             if (bomb.direction === undefined) {
-                bomb.direction = Math.random() < 0.5 ? -1 : 1; // -1 para esquerda, 1 para direita
+                bomb.direction = Math.random() < 0.5 ? -1 : 1;
             }
 
-            // Define a velocidade horizontal baseada na direção
-            const speedX = 0.7 * bomb.direction; // Ajuste a velocidade conforme necessário
+            const speedX = 0.7 * bomb.direction;
 
-            // Atualiza a posição horizontal da bomba
             bomb.x += speedX;
 
-            // Verifica se a bomba atingiu a borda e muda a direção se necessário
             if (bomb.x <= 0 || bomb.x >= game.config.width) {
-                bomb.direction *= -1; // Inverte a direção
+                bomb.direction *= -1;
             }
         });
 
+
         this.physics.world.collide(player, coins, collectCoin, null, this);
         this.physics.world.collide(player, bombs, hitBomb, null, this);
+        this.physics.world.collide(player, meteors, hitBomb, null, this);
+
+
+        if(level >= 1) {
+            if(meteorStarter){
+                meteorTimer = this.time.addEvent({
+                    delay: 2000, // A cada 10 segundos
+                    callback: spawnMeteor,
+                    callbackScope: this,
+                    loop: true
+                });
+                meteorStarter = false;
+            }
+        }
     }
-
-
 
     function collectCoin(player, coin) {
         coin.disableBody(true, true);
@@ -161,44 +171,40 @@
                 fill: "#ff0000",
                 align: "center"
             });
-            if(bomb != null){
+            if (bomb != null && bomb.texture.key !== 'meteor') {
                 bomb.disableBody(true, true);
             }
             gameOverText.setOrigin(0.5);
 
-            game.scene.scenes[0].time.delayedCall(1000, function() {
+            game.scene.scenes[0].time.delayedCall(1000, function () {
                 game.scene.scenes[0].scene.restart();
                 score = 0;
                 level = 0;
                 scoreLabel.setText("Score: " + score);
                 gameOverTextDisplayed = false;
-                gameStarted = false; // Reset the gameStarted flag
+                gameStarted = false;
+                meteorStarter = true;
             }, [], game.scene.scenes[0]);
         }
     }
 
     function spawnBombs() {
         bombs.clear(true, true);
-        const numBombs = 5 + (level - 1) * 2; // Começa com 5 e aumenta 2 a cada level
+        const numBombs = 5 + (level - 1) * 2;
 
-        // Obter a posição inicial do jogador
         const playerSpawnX = player.x;
         const playerSpawnY = player.y;
 
         for (let i = 0; i < numBombs; i++) {
             let bombX, bombY;
 
-            // Gerar posição aleatória para a bomba
             do {
                 bombX = Phaser.Math.Between(40, game.config.width - 40);
-                bombY = Phaser.Math.Between(40, game.config.height - 200); // Distância mínima de 200 pixels da borda inferior
+                bombY = Phaser.Math.Between(40, game.config.height - 200);
             } while (
-                // Verificar a distância mínima de 100 pixels em relação à posição do jogador
-            Phaser.Math.Distance.Between(bombX, bombY, playerSpawnX, playerSpawnY) < 100 ||
-            // Verificar a distância mínima de 60 pixels em relação a qualquer moeda
-            coins.getChildren().some((coin) => Phaser.Math.Distance.Between(bombX, bombY, coin.x, coin.y) < 60) ||
-            // Verificar a distância mínima de 80 pixels em relação a qualquer outra bomba
-            bombs.getChildren().some((otherBomb) => Phaser.Math.Distance.Between(bombX, bombY, otherBomb.x, otherBomb.y) < 80)
+                Phaser.Math.Distance.Between(bombX, bombY, playerSpawnX, playerSpawnY) < 100 ||
+                coins.getChildren().some((coin) => Phaser.Math.Distance.Between(bombX, bombY, coin.x, coin.y) < 60) ||
+                bombs.getChildren().some((otherBomb) => Phaser.Math.Distance.Between(bombX, bombY, otherBomb.x, otherBomb.y) < 80)
                 );
 
             const bomb = bombs.create(bombX, bombY, 'bomb');
@@ -208,20 +214,17 @@
         }
     }
 
-
     function spawnCoins() {
         coins.clear(true, true);
-        const numCoins = 10 + (level - 1); // Começa com 10 e aumenta 1 a cada level
+        const numCoins = 10 + (level - 1);
 
         for (let i = 0; i < numCoins; i++) {
             let coinX, coinY;
 
-            // Gerar posição aleatória para a moeda
             do {
                 coinX = Phaser.Math.Between(40, game.config.width - 40);
-                coinY = Phaser.Math.Between(40, game.config.height - 180); // Distância mínima de 200 pixels da borda inferior
+                coinY = Phaser.Math.Between(40, game.config.height - 180);
             } while (
-                // Verificar a distância mínima de 60 pixels em relação a qualquer bomba
                 bombs.getChildren().some((bomb) => Phaser.Math.Distance.Between(coinX, coinY, bomb.x, bomb.y) < 60)
                 );
 
@@ -232,11 +235,40 @@
         }
     }
 
+    function spawnMeteor() {
+        const side = Phaser.Math.Between(0, 3); // 0 = top, 1 = right, 2 = bottom, 3 = left
+        let meteorX, meteorY;
+
+        switch(side) {
+            case 0:
+                meteorX = Phaser.Math.Between(0, game.config.width);
+                meteorY = -40;
+                break;
+            case 1:
+                meteorX = game.config.width + 40;
+                meteorY = Phaser.Math.Between(0, game.config.height);
+                break;
+            case 2:
+                meteorX = Phaser.Math.Between(0, game.config.width);
+                meteorY = game.config.height + 40;
+                break;
+            case 3:
+                meteorX = -40;
+                meteorY = Phaser.Math.Between(0, game.config.height);
+                break;
+        }
+
+        const meteor = meteors.create(meteorX, meteorY, 'meteor');
+        meteor.setVelocityY(Phaser.Math.Between(50, 150)); // Random velocity downwards
+        meteor.setVelocityX(Phaser.Math.Between(-150, 150)); // Random horizontal velocity
+        meteor.setScale(50 / meteor.width); // Adjust meteor size
+        meteor.setAngularVelocity(Phaser.Math.Between(-100, 100)); // Random rotation speed
+    }
+
     function startGame() {
         gameStarted = true;
         player.setVisible(true);
         setupKeyboardEvents();
-        //this.scene.events.off('pointerdown', startGame);
         this.setVisible(false);
     }
 
@@ -245,7 +277,6 @@
         const rightKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
         const spaceKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-        // Adicionando eventos para as teclas A e D
         const aKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         const dKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
@@ -293,7 +324,6 @@
             player.setVelocityY(-200);
         });
 
-        // Adicionando evento para a tecla Enter
         const enterKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
         enterKey.on('down', function(event) {
             if (!gameStarted) {
