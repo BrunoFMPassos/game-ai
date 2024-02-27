@@ -1,366 +1,557 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>My Game</title>
     <script src="//cdn.jsdelivr.net/npm/phaser@3.50.1/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-image: url('images/space.jpg');
+            /* Adiciona o background 'space.jpg' */
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+    </style>
 </head>
+
 <body>
-<div id="game"></div>
-<script>
-    let coins;
-    let bombs;
-    let meteors;
-    let meteorTimer;
-    let meteorStarter = true;
-    let score = 0;
-    let player;
-    let scoreLabel;
-    let levelLabel;
-    let level = 0;
-    let gameOverTextDisplayed = false;
-    let gameStarted = false;
-    let startButton = "";
-    let storedHighScore;
-    let highScoreText;
-    let highScoreLabel;
+    <div id="game"></div>
+    <script>
+        let coins;
+        let bombs;
+        let delayLifeStar = 5000;
+        let meteors;
+        let stars; // Grupo de estrelas
+        let starTimer = false; // Temporizador para spawn da estrela
+        let meteorTimer;
+        let meteorStarter = true;
+        let score = 0;
+        let player;
+        let playerInvincibleSprite;
+        let scoreLabel;
+        let levelLabel;
+        let level = 0;
+        let gameOverTextDisplayed = false;
+        let gameStarted = false;
+        let startButton = "";
+        let storedHighScore;
+        let highScoreText;
+        let highScoreLabel;
+        let invincible = false; // Flag para indicar se o jogador está invencível
 
-    const game = new Phaser.Game({
-        type: Phaser.CANVAS,
-        parent: "game",
-        width: 800,
-        height: 600,
-        physics: {
-            default: "arcade",
-            arcade: {
-                gravity: { y: 250 }
-            }
-        },
-        scene: {
-            preload: preload,
-            create: create,
-            update: update
-        }
-    });
-
-    function preload() {
-        this.load.image("background", "images/background.jpg");
-        this.load.spritesheet("player", "images/playersprite.png", {
-            frameWidth: 655,
-            frameHeight: 970
-        });
-        this.load.image("coin", "images/coin.png");
-        this.load.image("bomb", "images/bomb.png");
-        this.load.image("meteor", "images/meteor.png");
-    }
-
-    function create() {
-        const background = this.add.image(400, 300, "background");
-        background.setScale(game.config.width / background.width+0.03, game.config.height / background.height);
-
-        const initialPlayerX = game.config.width / 2;
-        const initialPlayerY = game.config.height /2;
-
-        player = this.physics.add.sprite(initialPlayerX, initialPlayerY, "player");
-        player.setBounce(0.2);
-        player.setCollideWorldBounds(true);
-        player.setScale(75 / player.width);
-
-        coins = this.physics.add.group({ gravityY: 0 });
-        bombs = this.physics.add.group({ gravityY: 0 });
-        meteors = this.physics.add.group({ gravityY: 0 });
-
-        scoreLabel = this.add.text(10, 10, "Score: 0", {
-            fontSize: "24px",
-            fill: "#ffffff"
-        });
-
-        levelLabel = this.add.text(game.config.width - 10, 10, "Level: 0", {
-            fontSize: "24px",
-            fill: "#ffffff"
-        }).setOrigin(1, 0);
-
-        startButton = this.add.text(game.config.width / 2, game.config.height / 2, "Start Game", {
-            fontSize: "32px",
-            fill: "#ffffff",
-            backgroundColor: "#00000080",
-            padding: {
-                left: 20,
-                right: 20,
-                top: 10,
-                bottom: 10
+        const game = new Phaser.Game({
+            type: Phaser.CANVAS,
+            parent: "game",
+            width: 800,
+            height: 600,
+            physics: {
+                default: "arcade",
+                arcade: {
+                    gravity: {
+                        y: 250
+                    }
+                }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
             }
         });
 
-        startButton.setOrigin(0.5);
-        startButton.setInteractive();
-        startButton.on('pointerdown', startGame);
-
-        storedHighScore = localStorage.getItem('highscore');
-        highScoreText = storedHighScore !== null ? "High Score: " + storedHighScore : "High Score: 0";
-        highScoreLabel = this.add.text(game.config.width / 2, game.config.height / 2 + 50, highScoreText, {
-            fontSize: "24px",
-            fill: "#ffffff"
-        });
-        highScoreLabel.setOrigin(0.5);
-
-        coins.children.iterate(function (child) {
-            child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
-        });
-
-        bombs.children.iterate(function (child) {
-            child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
-        });
-
-        this.anims.create({
-            key: 'run',
-            frames: this.anims.generateFrameNumbers('player', { start: 0, end: 5 }),
-            frameRate: 7,
-            repeat: -1
-        });
-
-        player.play('run');
-
-        player.setVisible(false);
-    }
-
-
-    function update() {
-        if (!gameStarted) return;
-        bombs.getChildren().forEach(bomb => {
-            bomb.angle += 0.5;
-        });
-
-        if (player.y >= 544) {
-            hitBomb(player, null);
-        }
-        if (coins.countActive() === 0) {
-            level++;
-            levelLabel.setText("Level: " + level);
-
-            spawnCoins();
-            spawnBombs();
-        }
-
-        bombs.getChildren().forEach(bomb => {
-            if (bomb.direction === undefined) {
-                bomb.direction = Math.random() < 0.5 ? -1 : 1;
-            }
-
-            const speedX = 0.7 * bomb.direction;
-
-            bomb.x += speedX;
-
-            if (bomb.x <= 0 || bomb.x >= game.config.width) {
-                bomb.direction *= -1;
-            }
-        });
-
-
-        this.physics.world.collide(player, coins, collectCoin, null, this);
-        this.physics.world.collide(player, bombs, hitBomb, null, this);
-        this.physics.world.collide(player, meteors, hitBomb, null, this);
-
-        if(level >= 4) {
-            if(meteorStarter){
-                meteorTimer = this.time.addEvent({
-                    delay: 2000, // A cada 10 segundos
-                    callback: spawnMeteor,
-                    callbackScope: this,
-                    loop: true
-                });
-                meteorStarter = false;
-            }
-        }
-    }
-
-    function collectCoin(player, coin) {
-        coin.disableBody(true, true);
-        score += 10;
-        scoreLabel.setText("Score: " + score);
-
-        // Verificar se o novo score é maior que o high score atual
-        if (score > storedHighScore) {
-            localStorage.setItem('highscore', score);
-        }
-    }
-
-    function hitBomb(player, bomb) {
-        if (!gameOverTextDisplayed) {
-            gameOverTextDisplayed = true;
-            const gameOverText = game.scene.scenes[0].add.text(game.config.width / 2, game.config.height / 2, "Game Over", {
-                fontSize: "32px",
-                fill: "#ff0000",
-                align: "center"
+        function preload() {
+            this.load.image("background", "images/background.jpg");
+            this.load.spritesheet("player", "images/playersprite.png", {
+                frameWidth: 655,
+                frameHeight: 970
             });
-            if (bomb != null && bomb.texture.key !== 'meteor') {
-                bomb.disableBody(true, true);
-            }
-            gameOverText.setOrigin(0.5);
+            this.load.image("coin", "images/coin.png");
+            this.load.image("bomb", "images/bomb.png");
+            this.load.image("meteor", "images/meteor.png");
+            this.load.spritesheet("star", "images/lifestar.png", {
+                frameWidth: 990,
+                frameHeight: 1000
+            });
+            this.load.spritesheet("playerInvincible", "images/playerspriteinvincible.png", {
+                frameWidth: 655,
+                frameHeight: 970
+            });
+            this.load.spritesheet("explosion", "images/explosion.png", {
+                frameWidth: 1000,
+                frameHeight: 1000
+            });
+        }
 
-            game.scene.scenes[0].time.delayedCall(1000, function () {
-                game.scene.scenes[0].scene.restart();
-                score = 0;
-                level = 0;
-                scoreLabel.setText("Score: " + score);
-                gameOverTextDisplayed = false;
-                gameStarted = false;
-                meteorStarter = true;
-            }, [], game.scene.scenes[0]);
+        function create() {
+            const background = this.add.image(400, 300, "background");
+            background.setScale(game.config.width / background.width + 0.03, game.config.height / background.height);
+
+            const initialPlayerX = game.config.width / 2;
+            const initialPlayerY = game.config.height / 2;
+
+            player = this.physics.add.sprite(initialPlayerX, initialPlayerY, "player");
+            player.setBounce(0.2);
+            player.setCollideWorldBounds(true);
+            player.setScale(75 / player.width);
+
+
+            coins = this.physics.add.group({
+                gravityY: 0
+            });
+            bombs = this.physics.add.group({
+                gravityY: 0
+            });
+            meteors = this.physics.add.group({
+                gravityY: 0
+            });
+            stars = this.physics.add.group({
+                gravityY: 0
+            });
+
+            scoreLabel = this.add.text(10, 10, "Score: 0", {
+                fontSize: "24px",
+                fill: "#ffffff"
+            });
+
+            levelLabel = this.add.text(game.config.width - 10, 10, "Level: 0", {
+                fontSize: "24px",
+                fill: "#ffffff"
+            }).setOrigin(1, 0);
+
+            startButton = this.add.text(game.config.width / 2, game.config.height / 2, "Start Game", {
+                fontSize: "32px",
+                fill: "#ffffff",
+                backgroundColor: "#00000080",
+                padding: {
+                    left: 20,
+                    right: 20,
+                    top: 10,
+                    bottom: 10
+                }
+            });
+
+            startButton.setOrigin(0.5);
+            startButton.setInteractive();
+            startButton.on('pointerdown', startGame);
+
+            storedHighScore = localStorage.getItem('highscore');
+            highScoreText = storedHighScore !== null ? "High Score: " + storedHighScore : "High Score: 0";
+            highScoreLabel = this.add.text(game.config.width / 2, game.config.height / 2 + 50, highScoreText, {
+                fontSize: "24px",
+                fill: "#ffffff"
+            });
+            highScoreLabel.setOrigin(0.5);
+
+            coins.children.iterate(function (child) {
+                child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+            });
+
+            bombs.children.iterate(function (child) {
+                child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+            });
+
+            this.anims.create({
+                key: 'run',
+                frames: this.anims.generateFrameNumbers('player', {
+                    start: 0,
+                    end: 5
+                }),
+                frameRate: 7,
+                repeat: -1
+            });
+
+            this.anims.create({
+                key: 'runInvincible',
+                frames: this.anims.generateFrameNumbers('playerInvincible', {
+                    start: 0,
+                    end: 5
+                }),
+                frameRate: 7,
+                repeat: -1
+            });
+
+            player.play('run');
+
+            player.setVisible(false);
+
+            // Configuração da animação da estrela
+            this.anims.create({
+                key: 'star',
+                frames: this.anims.generateFrameNumbers('star', {
+                    start: 0,
+                    end: 5
+                }),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            // Crie a animação da explosão
+            this.anims.create({
+                key: 'explode',
+                frames: this.anims.generateFrameNumbers('explosion', { 
+                    start: 0, 
+                    end: 7 
+                }), // Ajuste os valores de acordo com o número de frames
+                frameRate: 10, // Ajuste conforme necessário
+                repeat: 0 // Não repete a animação
+            });
+        }
+
+
+        function update() {
+            if (!gameStarted) return;
+            bombs.getChildren().forEach(bomb => {
+                bomb.angle += 0.5;
+            });
+
+            if (player.y >= 544) {
+                hitBomb(player, null);
+            }
+            if (coins.countActive() === 0) {
+                level++;
+                levelLabel.setText("Level: " + level);
+
+                spawnCoins();
+                spawnBombs();
+            }
+
+
+            bombs.getChildren().forEach(bomb => {
+                if (bomb.direction === undefined) {
+                    bomb.direction = Math.random() < 0.5 ? -1 : 1;
+                }
+
+                const speedX = 0.7 * bomb.direction;
+
+                bomb.x += speedX;
+
+                if (bomb.x <= 0 || bomb.x >= game.config.width) {
+                    bomb.direction *= -1;
+                }
+            });
+
+
+            this.physics.world.collide(player, coins, collectCoin, null, this);
+            this.physics.world.collide(player, bombs, hitBomb, null, this);
+            this.physics.world.collide(player, meteors, hitBomb, null, this);
+            this.physics.world.collide(player, stars, collectStar, null, this);
+
+            if (level >= 4) {
+                if (meteorStarter) {
+                    meteorTimer = this.time.addEvent({
+                        delay: 2000, // A cada 10 segundos
+                        callback: spawnMeteor,
+                        callbackScope: this,
+                        loop: true
+                    });
+                    meteorStarter = false;
+                }
+            }
+
+             // Ativa o temporizador para spawn da estrela a partir do level 3
+            if (level >= 3) {
+                if (!starTimer) {
+                    starTimer = this.time.addEvent({
+                        delay: 3000, // a cada 5 segundos
+                        callback: spawnStar,
+                        callbackScope: this,
+                        loop: true
+                    });
+                    //starTimer = false;
+                }
+            }
+
+            // Verifica o movimento do jogador e atualiza a direção do sprite
+            if (player.body.velocity.x > 0) {
+                // Movendo para a direita
+                player.setFlipX(false); // Não espelha o sprite
+            } else if (player.body.velocity.x < 0) {
+                // Movendo para a esquerda
+                player.setFlipX(true); // Espelha o sprite
+            }
+
+        }
+
+        function updateStarTimer() {
+            const newDelay = 10000 + (level * 100);
+            starTimer.delay = newDelay;
+        }
+
+        function collectStar(player, star) {
+            // Se o jogador já estiver invencível, não faz nada
+            if (invincible) return;
+
+            // Coleta a estrela e torna o jogador invencível
+            star.disableBody(true, true);
+            star.destroy();
+            invincible = true;
+
+            // Troca o sprite do jogador para o sprite invencível
+            player.setTexture("playerInvincible");
+            // Inicia a animação do jogador invencível
+            player.play('runInvincible');
+
+            setTimeout(() => {
+                invincible = false;
+                player.setTexture("player");
+                // Reinicia a animação do jogador normal
+                player.play('run');
+            }, 5000); // 5 segundos de invencibilidade
+        }
+
+
+        function collectCoin(player, coin) {
+            coin.disableBody(true, true);
+            score += 10;
+            scoreLabel.setText("Score: " + score);
 
             // Verificar se o novo score é maior que o high score atual
             if (score > storedHighScore) {
                 localStorage.setItem('highscore', score);
             }
         }
-    }
 
-    function spawnBombs() {
-        bombs.clear(true, true);
-        const numBombs = 3 + (level - 1) * 1;
+        function hitBomb(player, bomb) {
+            if (!invincible) {
+                if (!gameOverTextDisplayed) {
+                    gameOverTextDisplayed = true;
 
-        const playerSpawnX = player.x;
-        const playerSpawnY = player.y;
+                    if (bomb) {
+                        bombs.getChildren().forEach(otherBomb => {
+                                // Crie o sprite de explosão na posição da bomba e ajuste o tamanho
+                                let explosion = this.add.sprite(bomb.x, bomb.y, 'explosion');
+                                explosion.setScale(300 / explosion.width);
+                                // Inicie a animação de explosão no sprite recém-criado
+                                explosion.play('explode');
+                                // Desativa a bomba
+                                bomb.disableBody(true, true);
+                            if (otherBomb !== bomb) {
+                                // Crie o sprite de explosão na posição da bomba e ajuste o tamanho
+                                let explosion = this.add.sprite(otherBomb.x, otherBomb.y, 'explosion');
+                                explosion.setScale(300 / explosion.width);
+                                // Inicie a animação de explosão no sprite recém-criado
+                                explosion.play('explode');
+                                // Desativa a bomba
+                                otherBomb.disableBody(true, true);
+                            }
+                        });
 
-        for (let i = 0; i < numBombs; i++) {
-            let bombX, bombY;
+                        // Aplique uma força ao jogador para empurrá-lo para longe da bomba
+                        const angleToBomb = Phaser.Math.Angle.Between(player.x, player.y, bomb.x, bomb.y);
+                        const forceMagnitude = 3000; // Ajuste conforme necessário
+                        const forceX = Math.cos(angleToBomb) * forceMagnitude;
+                        const forceY = Math.sin(angleToBomb) * forceMagnitude;
+                        player.setVelocity(forceX, forceY);
+                    }
 
-            do {
-                bombX = Phaser.Math.Between(40, game.config.width - 40);
-                bombY = Phaser.Math.Between(40, game.config.height - 200);
-            } while (
-                Phaser.Math.Distance.Between(bombX, bombY, playerSpawnX, playerSpawnY) < 100 ||
-                coins.getChildren().some((coin) => Phaser.Math.Distance.Between(bombX, bombY, coin.x, coin.y) < 60) ||
-                bombs.getChildren().some((otherBomb) => Phaser.Math.Distance.Between(bombX, bombY, otherBomb.x, otherBomb.y) < 80)
+                    const gameOverText = game.scene.scenes[0].add.text(game.config.width / 2, game.config.height / 2, "Game Over!", {
+                        fontSize: "70px",
+                        fill: "#ff0000",
+                        align: "center"
+                    });
+                    gameOverText.setOrigin(0.5);
+
+                    game.scene.scenes[0].time.delayedCall(1000, function () {
+                        game.scene.scenes[0].scene.restart();
+                        score = 0;
+                        level = 0;
+                        scoreLabel.setText("Score: " + score);
+                        gameOverTextDisplayed = false;
+                        gameStarted = false;
+                        meteorStarter = true;
+                        starTimer = false;
+                        invincible = false;
+                        delayLifeStar = 5000;
+                    }, [], game.scene.scenes[0]);
+
+                    // Verificar se o novo score é maior que o high score atual
+                    if (score > storedHighScore) {
+                        localStorage.setItem('highscore', score);
+                    }
+                }
+            }
+        }
+
+
+        function spawnBombs() {
+            bombs.clear(true, true);
+            const numBombs = 3 + (level - 1) * 1;
+
+            const playerSpawnX = player.x;
+            const playerSpawnY = player.y;
+
+            for (let i = 0; i < numBombs; i++) {
+                let bombX, bombY;
+
+                do {
+                    bombX = Phaser.Math.Between(40, game.config.width - 40);
+                    bombY = Phaser.Math.Between(40, game.config.height - 200);
+                } while (
+                    Phaser.Math.Distance.Between(bombX, bombY, playerSpawnX, playerSpawnY) < 100 ||
+                    coins.getChildren().some((coin) => Phaser.Math.Distance.Between(bombX, bombY, coin.x, coin.y) < 60) ||
+                    bombs.getChildren().some((otherBomb) => Phaser.Math.Distance.Between(bombX, bombY, otherBomb.x, otherBomb.y) < 80)
                 );
 
-            const bomb = bombs.create(bombX, bombY, 'bomb');
-            bomb.setBounce(1);
-            bomb.setScale(45 / bomb.width);
-            bomb.body.allowGravity = false;
+                const bomb = bombs.create(bombX, bombY, 'bomb');
+                bomb.setBounce(1);
+                bomb.setScale(45 / bomb.width);
+                bomb.body.allowGravity = false;
+            }
         }
-    }
 
-    function spawnCoins() {
-        coins.clear(true, true);
-        const numCoins = 4 + (level - 1);
+        function spawnCoins() {
+            coins.clear(true, true);
+            const numCoins = 4 + (level - 1);
 
-        for (let i = 0; i < numCoins; i++) {
-            let coinX, coinY;
+            for (let i = 0; i < numCoins; i++) {
+                let coinX, coinY;
 
-            do {
-                coinX = Phaser.Math.Between(40, game.config.width - 40);
-                coinY = Phaser.Math.Between(40, game.config.height - 180);
-            } while (
-                bombs.getChildren().some((bomb) => Phaser.Math.Distance.Between(coinX, coinY, bomb.x, bomb.y) < 60)
+                do {
+                    coinX = Phaser.Math.Between(40, game.config.width - 40);
+                    coinY = Phaser.Math.Between(40, game.config.height - 180);
+                } while (
+                    bombs.getChildren().some((bomb) => Phaser.Math.Distance.Between(coinX, coinY, bomb.x, bomb.y) < 60)
                 );
 
-            const coin = coins.create(coinX, coinY, 'coin');
-            coin.setBounce(1);
-            coin.setScale(40 / coin.width);
-            coin.body.allowGravity = false;
-        }
-    }
-
-    function spawnMeteor() {
-        const side = Phaser.Math.Between(0, 3); // 0 = top, 1 = right, 2 = bottom, 3 = left
-        let meteorX, meteorY;
-
-        switch(side) {
-            case 0:
-                meteorX = Phaser.Math.Between(0, game.config.width);
-                meteorY = -40;
-                break;
-            case 1:
-                meteorX = game.config.width + 40;
-                meteorY = Phaser.Math.Between(0, game.config.height);
-                break;
-            case 2:
-                meteorX = Phaser.Math.Between(0, game.config.width);
-                meteorY = game.config.height + 40;
-                break;
-            case 3:
-                meteorX = -40;
-                meteorY = Phaser.Math.Between(0, game.config.height);
-                break;
+                const coin = coins.create(coinX, coinY, 'coin');
+                coin.setBounce(1);
+                coin.setScale(40 / coin.width);
+                coin.body.allowGravity = false;
+            }
         }
 
-        const meteor = meteors.create(meteorX, meteorY, 'meteor');
-        meteor.setVelocityY(Phaser.Math.Between(50, 150)); // Random velocity downwards
-        meteor.setVelocityX(Phaser.Math.Between(-150, 150)); // Random horizontal velocity
-        meteor.setScale(50 / meteor.width); // Adjust meteor size
-        meteor.setAngularVelocity(Phaser.Math.Between(-100, 100)); // Random rotation speed
-    }
+        function spawnMeteor() {
+            const side = Phaser.Math.Between(0, 3); // 0 = top, 1 = right, 2 = bottom, 3 = left
+            let meteorX, meteorY;
 
-    function startGame() {
-        gameStarted = true;
-        player.setVisible(true);
-        setupKeyboardEvents();
-        this.setVisible(false);
-        highScoreLabel.setVisible(false);
-    }
-
-    function setupKeyboardEvents() {
-        const leftKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
-        const rightKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
-        const spaceKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-
-        const aKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-        const dKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-
-        leftKey.on('down', function(event) {
-            player.setVelocityX(-200);
-        });
-
-        leftKey.on('up', function(event) {
-            if (!rightKey.isDown && !dKey.isDown) {
-                player.setVelocityX(0);
+            switch (side) {
+                case 0:
+                    meteorX = Phaser.Math.Between(0, game.config.width);
+                    meteorY = -40;
+                    break;
+                case 1:
+                    meteorX = game.config.width + 40;
+                    meteorY = Phaser.Math.Between(0, game.config.height);
+                    break;
+                case 2:
+                    meteorX = Phaser.Math.Between(0, game.config.width);
+                    meteorY = game.config.height + 40;
+                    break;
+                case 3:
+                    meteorX = -40;
+                    meteorY = Phaser.Math.Between(0, game.config.height);
+                    break;
             }
-        });
 
-        rightKey.on('down', function(event) {
-            player.setVelocityX(200);
-        });
+            const meteor = meteors.create(meteorX, meteorY, 'meteor');
+            meteor.setVelocityY(Phaser.Math.Between(50, 150)); // Random velocity downwards
+            meteor.setVelocityX(Phaser.Math.Between(-150, 150)); // Random horizontal velocity
+            meteor.setScale(50 / meteor.width); // Adjust meteor size
+            meteor.setAngularVelocity(Phaser.Math.Between(-100, 100)); // Random rotation speed
+        }
 
-        rightKey.on('up', function(event) {
-            if (!leftKey.isDown && !aKey.isDown) {
-                player.setVelocityX(0);
-            }
-        });
+        function spawnStar() {
+            // Spawna uma estrela aleatoriamente na tela, garantindo uma distância mínima do jogador
+            let starX, starY;
+            do {
+                starX = Phaser.Math.Between(40, game.config.width - 40);
+                starY = Phaser.Math.Between(40, game.config.height - 180);
+            } while (Phaser.Math.Distance.Between(starX, starY, player.x, player.y) < 120);
 
-        aKey.on('down', function(event) {
-            player.setVelocityX(-200);
-        });
+            const star = stars.create(starX, starY, 'star');
+            star.setScale(50 / star.width);
+            star.anims.play('star', true); // Inicia a animação da estrela
+            star.setBounce(1);
+            star.setVelocity(Phaser.Math.Between(-100, 100), Phaser.Math.Between(-100, 100)); // Velocidade aleatória
+            star.setAngularVelocity(Phaser.Math.Between(-100, 100)); // Velocidade angular aleatória
+            star.body.allowGravity = false; // Gravidade zero
+            updateStarTimer();
 
-        aKey.on('up', function(event) {
-            if (!dKey.isDown && !rightKey.isDown) {
-                player.setVelocityX(0);
-            }
-        });
+            // Destroi a estrela após 5 segundos se não for capturada
+            setTimeout(() => {
+                if (star && star.active) {
+                    star.destroy();
+                }
+            }, 5000);
+        }
 
-        dKey.on('down', function(event) {
-            player.setVelocityX(200);
-        });
 
-        dKey.on('up', function(event) {
-            if (!aKey.isDown && !leftKey.isDown) {
-                player.setVelocityX(0);
-            }
-        });
+        function startGame() {
+            gameStarted = true;
+            player.setVisible(true);
+            setupKeyboardEvents();
+            this.setVisible(false);
+            highScoreLabel.setVisible(false);
+        }
 
-        spaceKey.on('down', function(event) {
-            player.setVelocityY(-200);
-        });
+        function setupKeyboardEvents() {
+            const leftKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+            const rightKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+            const spaceKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-        const enterKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-        enterKey.on('down', function(event) {
-            if (!gameStarted) {
-                startButton.setVisible(false);
-                highScoreLabel.setVisible(false);
-                startGame();
-            }
-        });
-    }
+            const aKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+            const dKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
-</script>
+            leftKey.on('down', function (event) {
+                player.setVelocityX(-200);
+            });
+
+            leftKey.on('up', function (event) {
+                if (!rightKey.isDown && !dKey.isDown) {
+                    player.setVelocityX(0);
+                }
+            });
+
+            rightKey.on('down', function (event) {
+                player.setVelocityX(200);
+            });
+
+            rightKey.on('up', function (event) {
+                if (!leftKey.isDown && !aKey.isDown) {
+                    player.setVelocityX(0);
+                }
+            });
+
+            aKey.on('down', function (event) {
+                player.setVelocityX(-200);
+            });
+
+            aKey.on('up', function (event) {
+                if (!dKey.isDown && !rightKey.isDown) {
+                    player.setVelocityX(0);
+                }
+            });
+
+            dKey.on('down', function (event) {
+                player.setVelocityX(200);
+            });
+
+            dKey.on('up', function (event) {
+                if (!aKey.isDown && !leftKey.isDown) {
+                    player.setVelocityX(0);
+                }
+            });
+
+            spaceKey.on('down', function (event) {
+                player.setVelocityY(-200);
+            });
+
+            const enterKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+            enterKey.on('down', function (event) {
+                if (!gameStarted) {
+                    startButton.setVisible(false);
+                    highScoreLabel.setVisible(false);
+                    startGame();
+                }
+            });
+        }
+    </script>
 </body>
+
 </html>
