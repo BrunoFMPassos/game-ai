@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crossy Road</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 600px;
+            background-color: #FFFF00;
+        }
+
+        #game {
+            background-color: #00FF00;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game"></div>
+    <script>
+        let gameScene = new Phaser.Scene('Game');
+
+        let config = {
+            type: Phaser.AUTO,
+            parent: 'game',
+            width: 800,
+            height: 600,
+            scene: gameScene,
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    debug: false
+                }
+            }
+        };
+
+        let game = new Phaser.Game(config);
+
+        let player;
+        let cars;
+        let lanes = [];
+        let cursors;
+        let carSpeed = 9;
+        let gameOver = false;
+
+        gameScene.preload = function () {
+            this.load.image('chicken', 'images/chicken.png');
+            this.load.image('car', 'images/car.png');
+            this.load.image('road', 'images/road.png');
+            this.load.image('sidewalk', 'images/sidewalk.png');
+        };
+
+        gameScene.create = function () {
+            // Criar faixas de estrada e calçada
+            let isSidewalk = true; // Começar com calçada
+            for (let i = 0; i < 5; i++) {
+                let lane;
+                if (isSidewalk) {
+                    lane = this.add.image(400, i * 150 + 75, 'sidewalk').setOrigin(0.5, 0.5);
+                } else {
+                    lane = this.add.image(400, i * 150 + 75, 'road').setOrigin(0.5, 0.5);
+                }
+                lane.displayHeight = 150;
+                lane.displayWidth = 800;
+                isSidewalk = !isSidewalk; // Alternar entre calçada e rua
+                lanes.push(lane);
+            }
+
+            // Adicionar galinha
+            player = this.physics.add.sprite(400, 550, 'chicken').setScale(0.06);
+
+            // Adicionar carros
+            cars = this.physics.add.group();
+
+            // Configurar controles do teclado
+            cursors = this.input.keyboard.createCursorKeys();
+
+            // Detectar colisão entre galinha e carros
+            this.physics.add.collider(player, cars, hitByCar, null, this);
+
+            // Criar loop de spawn de carros
+            this.time.addEvent({
+                delay: 2000,
+                callback: spawnCar,
+                callbackScope: this,
+                loop: true
+            });
+
+            // Controles de teclado para saltar
+            this.input.keyboard.on('keydown-SPACE', function () {
+                // Encontrar faixa atual da galinha
+                let currentLane = Math.floor(player.y / 150);
+
+                // Mover galinha para a próxima faixa
+                if (currentLane > 0) {
+                    player.y -= 150;
+                }
+            });
+        };
+
+        gameScene.update = function () {
+            // Verificar estado do jogo
+            if (gameOver) return;
+
+            // Controlar movimento da galinha
+            player.setVelocity(0);
+
+            if (cursors.left.isDown) {
+                player.setVelocityX(-200);
+            } else if (cursors.right.isDown) {
+                player.setVelocityX(200);
+            }
+
+            // Verificar se a galinha saiu da tela
+            if (player.x < 0 || player.x > 800) {
+                gameOver = true;
+                this.add.text(400, 300, 'Game Over', {
+                    fontSize: '24px',
+                    fill: '#ff0000'
+                }).setOrigin(0.5);
+                this.physics.pause();
+            }
+
+            // Movimentar carros
+            cars.getChildren().forEach(car => {
+                car.x -= carSpeed * this.physics.world.timeScale;
+
+                if (car.x < -100) {
+                    car.destroy();
+                }
+            });
+        };
+
+        function spawnCar() {
+            // Selecionar um índice de faixa ímpar
+            let laneIndex = Phaser.Math.Between(0, 1) * 2 + 1;
+            let laneY = laneIndex * 150 + 75;
+            
+            // Verificar se a faixa atual é uma rua (road)
+            let laneType = lanes[laneIndex].texture.key;
+            if (laneType === 'road') {
+                let laneX = 900;
+                // Criar carro na faixa selecionada
+                let car = cars.create(laneX, laneY, 'car').setScale(0.1);
+            }
+        }
+
+        // Função para colisão com carros
+        function hitByCar() {
+            gameOver = true;
+            gameScene.add.text(400, 300, 'Game Over', {
+                fontSize: '24px',
+                fill: '#ff0000'
+            }).setOrigin(0.5);
+            gameScene.physics.pause();
+        }
+    </script>
+</body>
+
+</html>
