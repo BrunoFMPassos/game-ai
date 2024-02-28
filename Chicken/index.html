@@ -64,13 +64,19 @@
         let roadSegments = 5; // Número inicial de segmentos de estrada visíveis
         let roadSegmentHeight = 100; // Altura de cada segmento de estrada
         let nextRoadSegmentY = roadSegments * roadSegmentHeight; // Próxima posição Y para gerar estrada
+        let score = 0; // Variável para armazenar a pontuação do jogador
 
         startScene.preload = function () {
             // Preload da cena de início, se necessário
+            this.load.image('background', 'images/background.png');
         };
 
         startScene.create = function () {
             // Criar cena de início
+            let background = this.add.image(400, 300, 'background').setOrigin(0.5);
+            background.displayWidth = config.width;
+            background.displayHeight = config.height;
+
             let startButton = this.add.text(400, 300, 'Start Game', {
                 fontSize: '32px',
                 fill: '#ffffff',
@@ -93,6 +99,7 @@
             this.load.image('car', 'images/car.png');
             this.load.image('road', 'images/road.png');
             this.load.image('sidewalk', 'images/sidewalk.png');
+            this.load.image('background', 'images/background.png');
         };
 
         gameScene.create = function () {
@@ -101,6 +108,13 @@
             if (startButton) {
                 startButton.destroy();
             }
+
+            let background = this.add.image(400, 300, 'background').setOrigin(0.5);
+            background.displayWidth = config.width;
+            background.displayHeight = config.height;
+
+            // Exibir a pontuação na tela
+            let scoreText = this.add.text(20, 20, 'Pontuação: 0', { fontSize: '24px', fill: '#fff' });
 
             // Criar faixas de estrada e calçada
             for (let i = 0; i < roadSegments; i++) {
@@ -186,8 +200,8 @@
             let laneIndex = Phaser.Math.Between(0, roadLanes.length - 1);
             let lane = roadLanes[laneIndex];
 
-            if( lane.texture.key === 'road'){
-            
+            if (lane.texture.key === 'road') {
+
                 // Verificar se a faixa selecionada é uma faixa de rua (road)
                 if (!lane || lane.texture.key !== 'road') {
                     return; // Se não for uma faixa de rua, sair da função sem spawnar um carro
@@ -211,9 +225,9 @@
                 // Inverter a orientação do sprite se a direção for para a direita
                 if (direction === 1) {
                     car.setFlipX(true);
-                    car.speed  = carSpeed * -1;
+                    car.speed = carSpeed * -1;
                 } else {
-                    car.speed  = carSpeed;
+                    car.speed = carSpeed;
                 }
             }
         }
@@ -237,7 +251,7 @@
                 }, [], gameScene);
             } else {
                 // Se a colisão for com uma faixa, apenas ignore
-                return;
+                increaseScore();
             }
         }
 
@@ -271,7 +285,7 @@
             // Verificar a última faixa gerada para garantir que não seja uma calçada
             let lastLaneType = lanes.length > 0 ? lanes[0].texture.key : null;
             let laneType;
-            
+
             // Se a última faixa foi uma calçada, gerar uma rua
             if (lastLaneType === 'sidewalk') {
                 laneType = 'road';
@@ -297,6 +311,13 @@
                     i--;
                 }
             }
+        }
+
+        function increaseScore() {
+            // Aumentar a pontuação
+            score += 10;
+            // Atualizar o texto da pontuação na tela
+            scoreText.setText('Pontuação: ' + score);
         }
     </script>
 </body>
