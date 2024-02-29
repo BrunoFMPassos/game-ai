@@ -57,7 +57,9 @@
         let cars;
         let lanes = [];
         let cursors;
-        let carSpeed = 7;
+        let carSpeed = 5;
+        let lastCarIndex = -1; 
+        let alive = true;
         let gameOver = false;
         let gridSize = 100; // Tamanho da célula da grade
         let playerGridPos; // posição da galinha na grade
@@ -65,6 +67,16 @@
         let roadSegmentHeight = 100; // Altura de cada segmento de estrada
         let nextRoadSegmentY = roadSegments * roadSegmentHeight; // Próxima posição Y para gerar estrada
         let score = 0; // Variável para armazenar a pontuação do jogador
+        let scoreText; // Texto de pontuação
+        let successfulCrossings = 0; // Contador de trocas de faixa bem-sucedidas
+        let maxCarSpeed = 10; // Velocidade máxima dos carros
+        let lastMoveTime = 0;
+        const moveInterval = 600; // Intervalo mínimo de 1 segundo entre as execuções
+        let isMovingLanes = false;
+
+        // Highscore
+        let highscore = localStorage.getItem('highscore') || 0;
+        let highscoreText;
 
         startScene.preload = function () {
             // Preload da cena de início, se necessário
@@ -77,6 +89,9 @@
             background.displayWidth = config.width;
             background.displayHeight = config.height;
 
+            // Exibir highscore na tela
+            highscoreText = this.add.text(400, 250, 'Highscore: ' + highscore, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
+            
             let startButton = this.add.text(400, 300, 'Start Game', {
                 fontSize: '32px',
                 fill: '#ffffff',
@@ -96,12 +111,17 @@
 
         gameScene.preload = function () {
             this.load.image('chicken', 'images/chicken.png');
-            this.load.image('car', 'images/car.png');
-            this.load.image('road', 'images/road.png');
-            this.load.image('sidewalk', 'images/sidewalk.png');
-            this.load.image('background', 'images/background.png');
+            this.load.image('car1', 'images/car1.png');
+            this.load.image('car2', 'images/car2.png');
+            this.load.image('car3', 'images/car3.png');
+            this.load.image('car4', 'images/car4.png');
+            this.load.image('car5', 'images/car5.png');
+            this.load.image('car6', 'images/car6.png');
+            this.load.image('road', 'images/road3.png');
+            this.load.image('sidewalk', 'images/sidewalk3.png');
+            this.load.image('background3', 'images/background3.png');
         };
-
+        
         gameScene.create = function () {
             // Remover o botão de início se já estiver presente
             let startButton = this.children.getByName('startButton');
@@ -109,20 +129,20 @@
                 startButton.destroy();
             }
 
-            let background = this.add.image(400, 300, 'background').setOrigin(0.5);
+            let background = this.add.image(400, 300, 'background3').setOrigin(0.5);
             background.displayWidth = config.width;
             background.displayHeight = config.height;
 
             // Exibir a pontuação na tela
-            let scoreText = this.add.text(20, 20, 'Pontuação: 0', { fontSize: '24px', fill: '#fff' });
-
+            scoreText = this.add.text(20, 20, 'Pontuação: 0', { fontSize: '24px', fill: '#fff' });
+            scoreText.setDepth(1);
             // Criar faixas de estrada e calçada
             for (let i = 0; i < roadSegments; i++) {
                 let lane;
                 if (i % 2 === 0) {
-                    lane = this.add.image(400, i * roadSegmentHeight + roadSegmentHeight / 2, 'road').setOrigin(0.5, 0.5);
-                } else {
                     lane = this.add.image(400, i * roadSegmentHeight + roadSegmentHeight / 2, 'sidewalk').setOrigin(0.5, 0.5);
+                } else {
+                    lane = this.add.image(400, i * roadSegmentHeight + roadSegmentHeight / 2, 'road').setOrigin(0.5, 0.5);
                 }
                 lane.displayHeight = gridSize;
                 lane.displayWidth = 850;
@@ -134,7 +154,7 @@
             cars = this.physics.add.group();
 
             // Adicionar galinha
-            player = this.physics.add.sprite(400, 550, 'chicken').setScale(0.05);
+            player = this.physics.add.sprite(400, 450, 'chicken').setScale(0.05);
             player.setDepth(1);
             // Definir posição inicial na grade
             playerGridPos = { x: 3.5, y: 5 };
@@ -147,16 +167,29 @@
 
             // Criar loop de spawn de carros
             this.time.addEvent({
-                delay: 700,
+                delay: 500,
                 callback: spawnCar,
                 callbackScope: this,
                 loop: true
             });
 
-            // Controles de teclado para movimentar faixas para baixo
+            // Adiciona um evento de teclado para movimentar faixas para baixo
             this.input.keyboard.on('keydown-SPACE', function () {
-                moveLanesDown();
-                moveCarsDown();
+                // Obtém o tempo atual
+                let currentTime = gameScene.time.now;
+
+                // Verifica se o tempo decorrido desde a última execução é maior que o intervalo mínimo
+                if (currentTime - lastMoveTime >= moveInterval && alive) {
+                    if(!isMovingLanes){
+                        // Executa o movimento das faixas e carros
+                        moveLanesDown();
+                        moveCarsDown();
+                        increaseScore();
+                        carSpeed += score / 1000;
+                        // Atualiza o tempo da última execução
+                        lastMoveTime = currentTime;
+                    }
+                }
             });
 
             // Configurar controles do teclado
@@ -192,66 +225,102 @@
                     car.destroy();
                 }
             });
+
         };
+
 
         function spawnCar() {
             // Selecionar um índice de faixa de estrada (road)
             let roadLanes = lanes.filter(lane => lane.texture.key === 'road'); // Filtrar apenas as faixas que são estradas
             let laneIndex = Phaser.Math.Between(0, roadLanes.length - 1);
             let lane = roadLanes[laneIndex];
-
-            if (lane.texture.key === 'road') {
-
+            if (!isMovingLanes){
                 // Verificar se a faixa selecionada é uma faixa de rua (road)
-                if (!lane || lane.texture.key !== 'road') {
-                    return; // Se não for uma faixa de rua, sair da função sem spawnar um carro
-                }
+                if (lane && lane.texture.key === 'road') {
 
-                // Definir a posição X e a direção com base no atributo "direcao" da faixa
-                let laneX, direction;
-                if (lane.direction === 'esquerda') {
-                    laneX = 800;
-                    direction = -1; // Movendo para a esquerda
-                } else {
-                    laneX = 0;
-                    direction = 1; // Movendo para a direita
-                }
+                    console.log(carSpeed);
+        
+                    // Escolher aleatoriamente um índice de carro diferente do último
+                    let carIndex = Phaser.Math.Between(1, 6); // Índices de 1 a 6 para corresponder aos arquivos car1.png até car6.png
+                    while (carIndex === lastCarIndex) { // Garantir que o novo índice seja diferente do último
+                        carIndex = Phaser.Math.Between(1, 6);
+                    }
+                    lastCarIndex = carIndex; // Atualizar o último índice de carro spawnado
 
-                // Criar carro na faixa selecionada
-                let car = cars.create(laneX, lane.y, 'car').setScale(0.1);
-                car.setDepth(1);
-                car.direction = direction; // Definir a direção do carro
+                    // Definir a posição X e a direção com base no atributo "direcao" da faixa
+                    let laneX, direction;
+                    if (lane.direction === 'esquerda') {
+                        laneX = 800;
+                        direction = -1; // Movendo para a esquerda
+                    } else {
+                        laneX = 0;
+                        direction = 1; // Movendo para a direita
+                    }
 
-                // Inverter a orientação do sprite se a direção for para a direita
-                if (direction === 1) {
-                    car.setFlipX(true);
-                    car.speed = carSpeed * -1;
-                } else {
-                    car.speed = carSpeed;
+                    // Criar carro na faixa selecionada
+                    let car = cars.create(laneX, lane.y, 'car' + carIndex).setScale(0.07);
+                    car.setDepth(1);
+                    car.direction = direction; // Definir a direção do carro
+
+                    // Inverter a orientação do sprite se a direção for para a direita
+                    if (direction === 1) {
+                        car.setFlipX(true);
+                        car.speed = carSpeed * -1;
+                    } else {
+                        car.speed = carSpeed;
+                    }
                 }
             }
         }
 
         // Função para colisão com carros e faixas
         function hitByCar(player, obstacle) {
-            if (obstacle.texture.key === 'car') {
+            if (obstacle.texture.key === 'car1' || obstacle.texture.key === 'car2' || obstacle.texture.key === 'car3' || obstacle.texture.key === 'car4' || obstacle.texture.key === 'car5' || obstacle.texture.key === 'car6') {
+                alive = false;
                 gameOver = true;
                 gameScene.add.text(400, 350, 'Game Over', {
-                    fontSize: '24px',
+                    fontSize: '70px',
                     fill: '#ff0000'
                 }).setOrigin(0.5);
 
                 // Pausar a física do jogo
-                gameScene.physics.pause();
+                //gameScene.physics.pause();
+
+                // Verificar e atualizar o highscore
+                if (score > highscore) {
+                    highscore = score;
+                    localStorage.setItem('highscore', highscore);
+                }
+
+                // Aplicar força aleatória à galinha para simular "voar"
+                direction_obstacle = obstacle.direction; // Definir a direção do carro
+
+                // Inverter a orientação do sprite se a direção for para a direita
+                let multiplicador = 1;
+                if (direction_obstacle != 1) {
+                    multiplicador = -1;
+                }
+                let forceX = Phaser.Math.Between(500*multiplicador, 3000*multiplicador); // Força aleatória no eixo X
+                let forceY = Phaser.Math.Between(500*multiplicador, 1800*multiplicador); // Força aleatória no eixo Y
+                player.setVelocity(forceX, forceY);
+                // Aplicar uma rotação aleatória à galinha
+                let angularVelocity = Phaser.Math.Between(-720, 720); // Velocidade angular aleatória
+                player.setAngularVelocity(angularVelocity);
+                // Impedir que a galinha ultrapasse as bordas do canvas
+                player.setCollideWorldBounds(true);
+                // Definir a velocidade dos carros para zero após a colisão com a galinha
+                obstacle.setVelocity(0);
 
                 // Reiniciar o jogo após um atraso de 2 segundos
                 gameScene.time.delayedCall(2000, function () {
+                    // Se o jogador morreu, reiniciar o contador de trocas de faixa bem-sucedidas
                     gameOver = false;
+                    alive = true;
+                    score = 0;
+                    carSpeed = 5;
+                    lanes = [];
                     gameScene.scene.start('Start'); // Redirecionar para a cena inicial
                 }, [], gameScene);
-            } else {
-                // Se a colisão for com uma faixa, apenas ignore
-                increaseScore();
             }
         }
 
@@ -262,24 +331,56 @@
         }
 
         function moveLanesDown() {
-            // Movimentar todas as faixas para baixo
-            lanes.forEach(function (lane) {
-                lane.y += gridSize;
-            });
-            // Gerar uma nova faixa no topo do canvas
-            generateNewLane();
-            // Remover faixas que estão fora do canvas na borda inferior
-            removeOffscreenLanes();
-            // Atualizar a próxima posição Y para gerar uma nova faixa
-            nextRoadSegmentY += roadSegmentHeight;
+            if (!isMovingLanes){
+                // Definir a duração da transição em milissegundos
+                let transitionDuration = 300;
+                isMovingLanes = true; // Define que o movimento está ocorrendo
+                // Movimentar todas as faixas para baixo com transição suave
+                lanes.forEach(function (lane) {
+                    gameScene.tweens.add({
+                        targets: lane,
+                        y: lane.y + gridSize, // Nova posição Y
+                        duration: transitionDuration, // Duração da transição
+                        ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                        onComplete: function () {
+                            isMovingLanes = false; // Define que o movimento terminou quando a animação é concluída
+                        }
+                    });
+                });
+
+                // Gerar uma nova faixa no topo do canvas
+                generateNewLane();
+
+                // Remover faixas que estão fora do canvas na borda inferior
+                removeOffscreenLanes();
+
+                // Atualizar a próxima posição Y para gerar uma nova faixa
+                nextRoadSegmentY += roadSegmentHeight;
+            }
         }
 
-        function moveCarsDown() {
-            // Movimentar todos os carros para baixo
+
+        function moveCarsDown(laneY) {
+            // Definir a duração da transição em milissegundos
+            let transitionDuration = 300;
+
+            // Movimentar todos os carros para baixo com transição suave
             cars.getChildren().forEach(car => {
-                car.y += gridSize;
+                let originalLaneY = car.y; // Armazenar a posição Y original do carro
+                let newLaneY = originalLaneY + gridSize; // Nova posição Y da faixa para o carro
+
+                gameScene.tweens.add({
+                    targets: car,
+                    y: newLaneY, // Nova posição Y do carro
+                    duration: transitionDuration, // Duração da transição
+                    ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                    onComplete: function () {
+                        // Callback opcional quando a transição estiver completa
+                    }
+                });
             });
         }
+
 
         function generateNewLane() {
             // Verificar a última faixa gerada para garantir que não seja uma calçada
@@ -315,10 +416,12 @@
 
         function increaseScore() {
             // Aumentar a pontuação
-            score += 10;
+            score += 5;
             // Atualizar o texto da pontuação na tela
             scoreText.setText('Pontuação: ' + score);
+            console.log("Score: "+score);
         }
+
     </script>
 </body>
 
