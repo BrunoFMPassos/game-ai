@@ -18,7 +18,6 @@
         }
 
         #game {
-            background-color: #00FF00;
             position: absolute;
             top: 50%;
             left: 50%;
@@ -55,6 +54,7 @@
 
         let player;
         let cars;
+        let trees;
         let lanes = [];
         let cursors;
         let carSpeed = 5;
@@ -66,12 +66,12 @@
         let roadSegments = 5; // Número inicial de segmentos de estrada visíveis
         let roadSegmentHeight = 100; // Altura de cada segmento de estrada
         let nextRoadSegmentY = roadSegments * roadSegmentHeight; // Próxima posição Y para gerar estrada
-        let score = 0; // Variável para armazenar a pontuação do jogador
-        let scoreText; // Texto de pontuação
+        let score = 0; // Variável para armazenar a score do jogador
+        let scoreText; // Texto de score
         let successfulCrossings = 0; // Contador de trocas de faixa bem-sucedidas
         let maxCarSpeed = 10; // Velocidade máxima dos carros
         let lastMoveTime = 0;
-        const moveInterval = 600; // Intervalo mínimo de 1 segundo entre as execuções
+        const moveInterval = 550; // Intervalo mínimo de 1 segundo entre as execuções
         let isMovingLanes = false;
 
         // Highscore
@@ -107,6 +107,10 @@
             startButton.on('pointerdown', () => {
                 this.scene.start('Game'); // Iniciar a cena do jogo ao clicar no botão
             });
+            const enterKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+            enterKey.on('down', () => {
+                this.scene.start('Game'); // Iniciar a cena do jogo ao pressionar enter
+            });
         };
 
         gameScene.preload = function () {
@@ -118,11 +122,14 @@
             this.load.image('car5', 'images/car5.png');
             this.load.image('car6', 'images/car6.png');
             this.load.image('road', 'images/road3.png');
+            this.load.image('tree1', 'images/tree1.png'); // Nova imagem para a árvore
             this.load.image('sidewalk', 'images/sidewalk3.png');
             this.load.image('background3', 'images/background3.png');
         };
         
         gameScene.create = function () {
+
+            let self = this;
             // Remover o botão de início se já estiver presente
             let startButton = this.children.getByName('startButton');
             if (startButton) {
@@ -133,8 +140,8 @@
             background.displayWidth = config.width;
             background.displayHeight = config.height;
 
-            // Exibir a pontuação na tela
-            scoreText = this.add.text(20, 20, 'Pontuação: 0', { fontSize: '24px', fill: '#fff' });
+            // Exibir a score na tela
+            scoreText = this.add.text(20, 20, 'score: 0', { fontSize: '24px', fill: '#fff' });
             scoreText.setDepth(1);
             // Criar faixas de estrada e calçada
             for (let i = 0; i < roadSegments; i++) {
@@ -182,9 +189,8 @@
                 if (currentTime - lastMoveTime >= moveInterval && alive) {
                     if(!isMovingLanes){
                         // Executa o movimento das faixas e carros
-                        moveLanesDown();
-                        moveCarsDown();
-                        increaseScore();
+                        moveLanesAnCarsDownIfNoTreeInNextLane();
+                        //moveLanesDown();
                         carSpeed += score / 1000;
                         // Atualiza o tempo da última execução
                         lastMoveTime = currentTime;
@@ -232,56 +238,105 @@
         function spawnCar() {
             // Selecionar um índice de faixa de estrada (road)
             let roadLanes = lanes.filter(lane => lane.texture.key === 'road'); // Filtrar apenas as faixas que são estradas
-            let laneIndex = Phaser.Math.Between(0, roadLanes.length - 1);
-            let lane = roadLanes[laneIndex];
-            if (!isMovingLanes){
-                // Verificar se a faixa selecionada é uma faixa de rua (road)
-                if (lane && lane.texture.key === 'road') {
 
-                    console.log(carSpeed);
-        
-                    // Escolher aleatoriamente um índice de carro diferente do último
-                    let carIndex = Phaser.Math.Between(1, 6); // Índices de 1 a 6 para corresponder aos arquivos car1.png até car6.png
-                    while (carIndex === lastCarIndex) { // Garantir que o novo índice seja diferente do último
-                        carIndex = Phaser.Math.Between(1, 6);
+            roadLanes.forEach(lane => {
+                if (!isMovingLanes) {
+                    // Verificar se a faixa selecionada é uma faixa de rua (road)
+                    if (lane && lane.texture.key === 'road') {
+                        console.log(carSpeed);
+
+                        // Definir a posição X e a direção com base no atributo "direcao" da faixa
+                        let laneX, direction;
+                        if (lane.direction === 'esquerda') {
+                            laneX = 800;
+                            direction = -1; // Movendo para a esquerda
+                        } else {
+                            laneX = 0;
+                            direction = 1; // Movendo para a direita
+                        }
+
+                        // Verificar a posição do último carro na faixa para manter a distância mínima
+                        let lastCarInLane = cars.getChildren().find(car => car.y === lane.y && car.direction === direction);
+                        if (!lastCarInLane || (direction === -1 && lastCarInLane.x - laneX >= 50) || (direction === 1 && laneX - lastCarInLane.x >= 50)) {
+                            // Criar carro na faixa selecionada
+                            let carIndex = Phaser.Math.Between(1, 6); // Índices de 1 a 6 para corresponder aos arquivos car1.png até car6.png
+                            let car = cars.create(laneX, lane.y, 'car' + carIndex).setScale(0.07);
+                            car.setDepth(1);
+                            car.direction = direction; // Definir a direção do carro
+
+                            // Inverter a orientação do sprite se a direção for para a direita
+                            if (direction === 1) {
+                                car.setFlipX(true);
+                                car.speed = carSpeed * -1;
+                            } else {
+                                car.speed = carSpeed;
+                            }
+                        }
                     }
-                    lastCarIndex = carIndex; // Atualizar o último índice de carro spawnado
+                }
+            });
+        }
 
-                    // Definir a posição X e a direção com base no atributo "direcao" da faixa
-                    let laneX, direction;
-                    if (lane.direction === 'esquerda') {
-                        laneX = 800;
-                        direction = -1; // Movendo para a esquerda
-                    } else {
-                        laneX = 0;
-                        direction = 1; // Movendo para a direita
+        function spawnTrees(lane) {
+            // Spawn de árvores nas calçadas
+            if (lane.laneType == "sidewalk") {
+                // Array para armazenar as posições X das árvores nesta faixa de calçada
+                let treePositionsX = [];
+
+                // Preenche o array com as posições X das árvores já existentes nesta faixa
+                gameScene.children.each(child => {
+                    // Verifica se o objeto é uma árvore e está na mesma faixa de calçada
+                    if (child.texture && child.texture.key === 'tree1' && child.y === lane.y) {
+                        treePositionsX.push(child.x);
                     }
+                });
 
-                    // Criar carro na faixa selecionada
-                    let car = cars.create(laneX, lane.y, 'car' + carIndex).setScale(0.07);
-                    car.setDepth(1);
-                    car.direction = direction; // Definir a direção do carro
+                // Calcula a largura efetiva da faixa de calçada, levando em conta as margens do canvas
+                let effectiveLaneWidth = lane.displayWidth - 100; // Reduzindo 100 pixels para manter uma margem de segurança
 
-                    // Inverter a orientação do sprite se a direção for para a direita
-                    if (direction === 1) {
-                        car.setFlipX(true);
-                        car.speed = carSpeed * -1;
-                    } else {
-                        car.speed = carSpeed;
-                    }
+                // Calcula o número aleatório de árvores entre 1 e 3
+                let numTrees = Phaser.Math.Between(1, 3);
+
+                // Loop para criar e posicionar as árvores
+                for (let i = 0; i < numTrees; i++) {
+                    // Variável para armazenar a posição X da nova árvore
+                    let treeX;
+
+                    // Loop para garantir que a nova posição X não se sobreponha a uma árvore existente
+                    do {
+                        // Calcula uma posição X aleatória dentro da faixa de calçada
+                        let minX = lane.x - effectiveLaneWidth / 2;
+                        let maxX = lane.x + effectiveLaneWidth / 2;
+                        treeX = Phaser.Math.Between(minX, maxX);
+
+                        // Garante que a árvore permaneça dentro dos limites do canvas
+                        treeX = Phaser.Math.Clamp(treeX, 50, config.width - 50); // 50 é uma margem de segurança para evitar que as árvores fiquem muito próximas das bordas
+                    } while (treePositionsX.some(positionX => Math.abs(positionX - treeX) < 100)); // Verifica se a nova árvore está muito próxima de uma árvore existente
+
+                    // Atualiza o array de posições X das árvores nesta faixa de calçada
+                    treePositionsX.push(treeX);
+
+                    // Cria a árvore na posição calculada
+                    let tree = gameScene.add.image(treeX, lane.y, 'tree1').setScale(0.06);
+                    console.log("lane :" + lane.y);
+                    console.log("Treeeee :" + tree.y);
+                    tree.setDepth(1);
                 }
             }
         }
+
+
+
 
         // Função para colisão com carros e faixas
         function hitByCar(player, obstacle) {
             if (obstacle.texture.key === 'car1' || obstacle.texture.key === 'car2' || obstacle.texture.key === 'car3' || obstacle.texture.key === 'car4' || obstacle.texture.key === 'car5' || obstacle.texture.key === 'car6') {
                 alive = false;
                 gameOver = true;
-                gameScene.add.text(400, 350, 'Game Over', {
+                gameScene.add.text(400, 300, 'Game Over', {
                     fontSize: '70px',
                     fill: '#ff0000'
-                }).setOrigin(0.5);
+                }).setOrigin(0.5).setDepth(1);
 
                 // Pausar a física do jogo
                 //gameScene.physics.pause();
@@ -330,6 +385,24 @@
             //player.y = lanes[playerGridPos.y].y - gridSize / 2; // Posição Y ajustada para a parte superior da faixa
         }
 
+        function moveLanesAnCarsDownIfNoTreeInNextLane() {
+            // Obtém a próxima posição horizontal do jogador
+            let nextPlayerX = playerGridPos.x + (playerGridPos.x < 3.5 ? -1 : 1);
+
+            // Verifica se há árvores na próxima faixa horizontal
+            let hasTreeInNextLane = gameScene.children.list.some(child => {
+                return child.texture && child.texture.key === 'tree1' && child.y === lanes[playerGridPos.y].y && Math.abs(child.x - (nextPlayerX * gridSize + gridSize / 2)) < gridSize / 2;
+            });
+
+            // Executa o movimento das faixas apenas se não houver árvore na próxima faixa horizontal
+            if (!hasTreeInNextLane) {
+                moveLanesDown();
+                moveCarsDown();
+                increaseScore();
+            }
+        }
+
+
         function moveLanesDown() {
             if (!isMovingLanes){
                 // Definir a duração da transição em milissegundos
@@ -346,11 +419,20 @@
                             isMovingLanes = false; // Define que o movimento terminou quando a animação é concluída
                         }
                     });
+                    if(lane.laneType == "sidewalk"){
+                        console.log("New lane position real: "+lane.y + gridSize);
+                    }
+                    // Percorre todos os objetos na cena
+                    gameScene.children.each(function (child) {
+                        // Verifica se o objeto é uma árvore (você precisa ajustar essa verificação conforme a estrutura do seu código)
+                        if (child.texture && child.texture.key === 'tree1') {
+                            // Imprime a posição x da árvore
+                            moveTreeDown(child);
+                        }
+                    });
                 });
-
                 // Gerar uma nova faixa no topo do canvas
                 generateNewLane();
-
                 // Remover faixas que estão fora do canvas na borda inferior
                 removeOffscreenLanes();
 
@@ -360,7 +442,7 @@
         }
 
 
-        function moveCarsDown(laneY) {
+        function moveCarsDown() {
             // Definir a duração da transição em milissegundos
             let transitionDuration = 300;
 
@@ -376,9 +458,37 @@
                     ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
                     onComplete: function () {
                         // Callback opcional quando a transição estiver completa
+                        if (car.y > config.height + 100 || car.y < -100) {
+                            car.destroy(); // Destruir o carro se estiver fora do canvas
+                        }
                     }
                 });
             });
+        }
+
+        function moveTreeDown(tree) {
+            // Definir a duração da transição em milissegundos
+            let transitionDuration = 300;
+
+            // Movimentar todos os carros para baixo com transição suave
+                console.log("tree.y: "+tree.y);
+                let originalLaneY = tree.y; // Armazenar a posição Y original do carro
+                console.log("Original Lane: "+originalLaneY);
+                let newLaneY = originalLaneY  + gridSize; // Nova posição Y da faixa para o carro
+                console.log("newLaane: "+newLaneY);
+
+                gameScene.tweens.add({
+                    targets: tree,
+                    y: newLaneY, // Nova posição Y do carro
+                    duration: transitionDuration, // Duração da transição
+                    ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                    onComplete: function () {
+                        // Callback opcional quando a transição estiver completa
+                        if (tree.y > config.height + 100 || tree.y < -100) {
+                            tree.destroy(); // Destruir o carro se estiver fora do canvas
+                        }
+                    }
+                });
         }
 
 
@@ -398,9 +508,11 @@
             let newLane = gameScene.add.image(400, -gridSize / 2, laneType).setOrigin(0.5, 0.5);
             newLane.displayHeight = gridSize;
             newLane.displayWidth = 850;
+            newLane.laneType = laneType;
             let direction = Phaser.Math.RND.pick(['esquerda', 'direita']); // Aleatoriamente escolhe 'esquerda' ou 'direita' para a direção da faixa
             newLane.direction = direction; // Adicionando o atributo direcao à faixa
             lanes.unshift(newLane); // Adicionar no início do array para que fique no topo
+            spawnTrees(newLane);
         }
 
         function removeOffscreenLanes() {
@@ -415,10 +527,10 @@
         }
 
         function increaseScore() {
-            // Aumentar a pontuação
+            // Aumentar a score
             score += 5;
-            // Atualizar o texto da pontuação na tela
-            scoreText.setText('Pontuação: ' + score);
+            // Atualizar o texto da score na tela
+            scoreText.setText('score: ' + score);
             console.log("Score: "+score);
         }
 
