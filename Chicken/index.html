@@ -74,9 +74,9 @@
         const moveInterval = 550; // Intervalo mínimo de 1 segundo entre as execuções
         let isMovingLanes = false;
 
-        // Highscore
-        let highscore = localStorage.getItem('highscore') || 0;
-        let highscoreText;
+        // chikenhighscore
+        let chikenhighscore = localStorage.getItem('chikenhighscore') || 0;
+        let chikenhighscoreText;
 
         startScene.preload = function () {
             // Preload da cena de início, se necessário
@@ -89,8 +89,8 @@
             background.displayWidth = config.width;
             background.displayHeight = config.height;
 
-            // Exibir highscore na tela
-            highscoreText = this.add.text(400, 250, 'Highscore: ' + highscore, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
+            // Exibir chikenhighscore na tela
+            chikenhighscoreText = this.add.text(400, 250, 'chikenhighscore: ' + chikenhighscore, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
             
             let startButton = this.add.text(400, 300, 'Start Game', {
                 fontSize: '32px',
@@ -173,12 +173,12 @@
             this.physics.add.collider(player, cars, hitByCar, null, this);
 
             // Criar loop de spawn de carros
-            this.time.addEvent({
+            /*this.time.addEvent({
                 delay: 500,
                 callback: spawnCar,
                 callbackScope: this,
                 loop: true
-            });
+            });*/
 
             // Adiciona um evento de teclado para movimentar faixas para baixo
             this.input.keyboard.on('keydown-SPACE', function () {
@@ -213,13 +213,11 @@
             // Detectar clique de teclas para movimentação
             if (Phaser.Input.Keyboard.JustDown(moveLeftKey)) {
                 if (playerGridPos.x > 0) {
-                    playerGridPos.x--;
-                    updatePlayerPosition();
+                    updatePlayerPosition("left");
                 }
             } else if (Phaser.Input.Keyboard.JustDown(moveRightKey)) {
                 if (playerGridPos.x < 7) { // Limite da grade do eixo x
-                    playerGridPos.x++;
-                    updatePlayerPosition();
+                    updatePlayerPosition("right");
                 }
             }
 
@@ -243,7 +241,6 @@
                 if (!isMovingLanes) {
                     // Verificar se a faixa selecionada é uma faixa de rua (road)
                     if (lane && lane.texture.key === 'road') {
-                        console.log(carSpeed);
 
                         // Definir a posição X e a direção com base no atributo "direcao" da faixa
                         let laneX, direction;
@@ -291,9 +288,6 @@
                     }
                 });
 
-                // Calcula a largura efetiva da faixa de calçada, levando em conta as margens do canvas
-                let effectiveLaneWidth = lane.displayWidth - 100; // Reduzindo 100 pixels para manter uma margem de segurança
-
                 // Calcula o número aleatório de árvores entre 1 e 3
                 let numTrees = Phaser.Math.Between(1, 3);
 
@@ -305,12 +299,10 @@
                     // Loop para garantir que a nova posição X não se sobreponha a uma árvore existente
                     do {
                         // Calcula uma posição X aleatória dentro da faixa de calçada
-                        let minX = lane.x - effectiveLaneWidth / 2;
-                        let maxX = lane.x + effectiveLaneWidth / 2;
-                        treeX = Phaser.Math.Between(minX, maxX);
+                        treeX = Phaser.Math.Between(-50, 750);
+                        // Arredonda para o múltiplo de 50 mais próximo
+                        treeX = Math.round(treeX / 50) * 50;
 
-                        // Garante que a árvore permaneça dentro dos limites do canvas
-                        treeX = Phaser.Math.Clamp(treeX, 50, config.width - 50); // 50 é uma margem de segurança para evitar que as árvores fiquem muito próximas das bordas
                     } while (treePositionsX.some(positionX => Math.abs(positionX - treeX) < 100)); // Verifica se a nova árvore está muito próxima de uma árvore existente
 
                     // Atualiza o array de posições X das árvores nesta faixa de calçada
@@ -318,13 +310,10 @@
 
                     // Cria a árvore na posição calculada
                     let tree = gameScene.add.image(treeX, lane.y, 'tree1').setScale(0.06);
-                    console.log("lane :" + lane.y);
-                    console.log("Treeeee :" + tree.y);
                     tree.setDepth(1);
                 }
             }
         }
-
 
 
 
@@ -341,10 +330,10 @@
                 // Pausar a física do jogo
                 //gameScene.physics.pause();
 
-                // Verificar e atualizar o highscore
-                if (score > highscore) {
-                    highscore = score;
-                    localStorage.setItem('highscore', highscore);
+                // Verificar e atualizar o chikenhighscore
+                if (score > chikenhighscore) {
+                    chikenhighscore = score;
+                    localStorage.setItem('chikenhighscore', chikenhighscore);
                 }
 
                 // Aplicar força aleatória à galinha para simular "voar"
@@ -379,28 +368,52 @@
             }
         }
 
-        function updatePlayerPosition() {
-            // Atualizar a posição da galinha de acordo com a posição na grade
-            player.x = playerGridPos.x * gridSize + gridSize / 2;
-            //player.y = lanes[playerGridPos.y].y - gridSize / 2; // Posição Y ajustada para a parte superior da faixa
-        }
-
-        function moveLanesAnCarsDownIfNoTreeInNextLane() {
-            // Obtém a próxima posição horizontal do jogador
-            let nextPlayerX = playerGridPos.x + (playerGridPos.x < 3.5 ? -1 : 1);
-
-            // Verifica se há árvores na próxima faixa horizontal
-            let hasTreeInNextLane = gameScene.children.list.some(child => {
-                return child.texture && child.texture.key === 'tree1' && child.y === lanes[playerGridPos.y].y && Math.abs(child.x - (nextPlayerX * gridSize + gridSize / 2)) < gridSize / 2;
+        function updatePlayerPosition(position) {
+            // Calcula a próxima posição horizontal do jogador com base na direção do movimento
+            let nextPlayerX = playerGridPos.x + (position == "right" ? 1 : -1);
+            // Verifica se há uma árvore na próxima posição (mesma linha e próxima coluna)
+            let currentLane = lanes[playerGridPos.y];
+            let nextLaneX = nextPlayerX * gridSize + gridSize / 2;
+            let hasTreeInNextPosition = gameScene.children.list.some(child => {
+                return child.texture && child.texture.key === 'tree1' && child.y === currentLane.y && Math.abs(child.x - nextLaneX) < gridSize / 2;
             });
 
-            // Executa o movimento das faixas apenas se não houver árvore na próxima faixa horizontal
+            // Atualiza a posição do jogador apenas se não houver árvore na próxima posição em X
+            if (!hasTreeInNextPosition) {
+                //playerGridPos.x = nextPlayerX;
+                if(position == "left"){
+                    playerGridPos.x--;
+                    player.x = playerGridPos.x * gridSize + gridSize / 2;
+                }else if(position == "right"){
+                    playerGridPos.x++;
+                    player.x = playerGridPos.x * gridSize + gridSize / 2;
+                }
+            }
+        }
+
+
+
+        function moveLanesAnCarsDownIfNoTreeInNextLane() {
+            // Calcula a posição exata da próxima faixa horizontal
+            // Verifica se há uma árvore exatamente à frente do jogador
+            var teste = (playerGridPos.x*gridSize)+(gridSize/2);
+
+            let hasTreeInNextLane = gameScene.children.list.some(child => {
+                if(child.texture && child.texture.key === 'tree1'){
+                    console.log("Arvore y: " + child.y);
+                    console.log("Arvore x: " + child.x);
+                }
+                return child.texture && child.texture.key === 'tree1' && child.y === 350  && child.x === (playerGridPos.x*gridSize)+(gridSize/2);
+            });
+
+            // Executa o movimento das faixas apenas se não houver árvore à frente do jogador
             if (!hasTreeInNextLane) {
                 moveLanesDown();
                 moveCarsDown();
                 increaseScore();
             }
         }
+
 
 
         function moveLanesDown() {
@@ -419,9 +432,7 @@
                             isMovingLanes = false; // Define que o movimento terminou quando a animação é concluída
                         }
                     });
-                    if(lane.laneType == "sidewalk"){
-                        console.log("New lane position real: "+lane.y + gridSize);
-                    }
+            
                     // Percorre todos os objetos na cena
                     gameScene.children.each(function (child) {
                         // Verifica se o objeto é uma árvore (você precisa ajustar essa verificação conforme a estrutura do seu código)
@@ -471,11 +482,8 @@
             let transitionDuration = 300;
 
             // Movimentar todos os carros para baixo com transição suave
-                console.log("tree.y: "+tree.y);
                 let originalLaneY = tree.y; // Armazenar a posição Y original do carro
-                console.log("Original Lane: "+originalLaneY);
                 let newLaneY = originalLaneY  + gridSize; // Nova posição Y da faixa para o carro
-                console.log("newLaane: "+newLaneY);
 
                 gameScene.tweens.add({
                     targets: tree,
@@ -531,7 +539,6 @@
             score += 5;
             // Atualizar o texto da score na tela
             scoreText.setText('score: ' + score);
-            console.log("Score: "+score);
         }
 
     </script>
