@@ -54,6 +54,7 @@
 
         let player;
         let cars;
+        let trains;
         let trees;
         let lanes = [];
         let cursors;
@@ -90,9 +91,9 @@
             background.displayHeight = config.height;
 
             // Exibir chikenhighscore na tela
-            chikenhighscoreText = this.add.text(400, 250, 'chikenhighscore: ' + chikenhighscore, { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
+            chikenhighscoreText = this.add.text(400, 100, 'Highscore: ' + chikenhighscore, { fontSize: '40px', fill: '#fff' }).setOrigin(0.5);
             
-            let startButton = this.add.text(400, 300, 'Start Game', {
+            let startButton = this.add.text(400, 400, 'Start Game', {
                 fontSize: '32px',
                 fill: '#ffffff',
                 backgroundColor: '#008CBA',
@@ -121,7 +122,9 @@
             this.load.image('car4', 'images/car4.png');
             this.load.image('car5', 'images/car5.png');
             this.load.image('car6', 'images/car6.png');
+            this.load.image('train', 'images/train.png');
             this.load.image('road', 'images/road3.png');
+            this.load.image('trainroad', 'images/trainroad.png');
             this.load.image('tree1', 'images/tree1.png'); // Nova imagem para a árvore
             this.load.image('sidewalk', 'images/sidewalk3.png');
             this.load.image('background3', 'images/background3.png');
@@ -160,6 +163,8 @@
             // Adicionar carros
             cars = this.physics.add.group();
 
+            trains = this.physics.add.group();
+
             // Adicionar galinha
             player = this.physics.add.sprite(400, 450, 'chicken').setScale(0.05);
             player.setDepth(1);
@@ -171,14 +176,23 @@
 
             // Detectar colisão entre galinha e carros
             this.physics.add.collider(player, cars, hitByCar, null, this);
+            this.physics.add.collider(player, trains, hitByCar, null, this);
 
             // Criar loop de spawn de carros
-            /*this.time.addEvent({
+            this.time.addEvent({
                 delay: 500,
                 callback: spawnCar,
                 callbackScope: this,
                 loop: true
-            });*/
+            });
+
+            // Criar loop de spawn de carros
+             this.time.addEvent({
+                delay: 5000,
+                callback: spawnTrain,
+                callbackScope: this,
+                loop: true
+            });
 
             // Adiciona um evento de teclado para movimentar faixas para baixo
             this.input.keyboard.on('keydown-SPACE', function () {
@@ -212,11 +226,11 @@
 
             // Detectar clique de teclas para movimentação
             if (Phaser.Input.Keyboard.JustDown(moveLeftKey)) {
-                if (playerGridPos.x > 0) {
+                if ((playerGridPos.x-1) > 0) {
                     updatePlayerPosition("left");
                 }
             } else if (Phaser.Input.Keyboard.JustDown(moveRightKey)) {
-                if (playerGridPos.x < 7) { // Limite da grade do eixo x
+                if ((playerGridPos.x+1) < 7) { // Limite da grade do eixo x
                     updatePlayerPosition("right");
                 }
             }
@@ -227,6 +241,15 @@
 
                 if (car.x < -100 || car.x > 900) {
                     car.destroy();
+                }
+            });
+
+            // Movimentar trens
+            trains.getChildren().forEach(train => {
+                train.x -= train.speed * this.physics.world.timeScale;
+
+                if (train.x < -900 || train.x > 1700) {
+                    train.destroy();
                 }
             });
 
@@ -274,6 +297,42 @@
             });
         }
 
+        function spawnTrain() {
+            // Selecionar as faixas de trem (trainroad)
+            let trainRoadLanes = lanes.filter(lane => lane.texture.key === 'trainroad');
+
+            trainRoadLanes.forEach(lane => {
+                // Verificar se a faixa selecionada é uma faixa de trem (trainroad)
+                if (lane && lane.texture.key === 'trainroad') {
+                    // Definir a posição X e a direção com base no atributo "direcao" da faixa
+                    let laneX, direction;
+                    if (lane.direction === 'esquerda') {
+                        laneX = 850;
+                        direction = -1; // Movendo para a esquerda
+                    } else {
+                        laneX = -50;
+                        direction = 1; // Movendo para a direita
+                    }
+
+                    // Verificar se é hora de spawnar um trem nesta faixa
+                        // Criar trem na faixa selecionada
+                        let train = trains.create(laneX, lane.y, 'train').setScale(0.15);
+                        train.setDepth(1);
+                        train.direction = direction; // Definir a direção do trem
+                        train.speed = carSpeed * 1.5; // Velocidade do trem é 1.5 vezes a velocidade do carro
+
+                        // Inverter a orientação do sprite se a direção for para a direita
+                        if (direction === 1) {
+                            train.setFlipX(true);      
+                            train.speed = (carSpeed* 1.5) * -1;
+                        } else {
+                            train.speed = (carSpeed* 1.5);
+                        }
+                }
+            });
+        }
+
+
         function spawnTrees(lane) {
             // Spawn de árvores nas calçadas
             if (lane.laneType == "sidewalk") {
@@ -299,10 +358,9 @@
                     // Loop para garantir que a nova posição X não se sobreponha a uma árvore existente
                     do {
                         // Calcula uma posição X aleatória dentro da faixa de calçada
-                        treeX = Phaser.Math.Between(-50, 750);
+                        treeX = Phaser.Math.Between(50, 600);
                         // Arredonda para o múltiplo de 50 mais próximo
-                        treeX = Math.round(treeX / 50) * 50;
-
+                        treeX = Math.round(treeX / 100) * 100;
                     } while (treePositionsX.some(positionX => Math.abs(positionX - treeX) < 100)); // Verifica se a nova árvore está muito próxima de uma árvore existente
 
                     // Atualiza o array de posições X das árvores nesta faixa de calçada
@@ -319,7 +377,7 @@
 
         // Função para colisão com carros e faixas
         function hitByCar(player, obstacle) {
-            if (obstacle.texture.key === 'car1' || obstacle.texture.key === 'car2' || obstacle.texture.key === 'car3' || obstacle.texture.key === 'car4' || obstacle.texture.key === 'car5' || obstacle.texture.key === 'car6') {
+            if (obstacle.texture.key === 'car1' || obstacle.texture.key === 'car2' || obstacle.texture.key === 'car3' || obstacle.texture.key === 'car4' || obstacle.texture.key === 'car5' || obstacle.texture.key === 'car6' || obstacle.texture.key === 'train') {
                 alive = false;
                 gameOver = true;
                 gameScene.add.text(400, 300, 'Game Over', {
@@ -375,7 +433,8 @@
             let currentLane = lanes[playerGridPos.y];
             let nextLaneX = nextPlayerX * gridSize + gridSize / 2;
             let hasTreeInNextPosition = gameScene.children.list.some(child => {
-                return child.texture && child.texture.key === 'tree1' && child.y === currentLane.y && Math.abs(child.x - nextLaneX) < gridSize / 2;
+                //return child.texture && child.texture.key === 'tree1' && child.y === currentLane.y && Math.abs(child.x - nextLaneX) < gridSize / 2;
+                return child.texture && child.texture.key === 'tree1' && child.y === 450  && child.x === (nextPlayerX*gridSize)+(gridSize/2);
             });
 
             // Atualiza a posição do jogador apenas se não houver árvore na próxima posição em X
@@ -399,16 +458,13 @@
             var teste = (playerGridPos.x*gridSize)+(gridSize/2);
 
             let hasTreeInNextLane = gameScene.children.list.some(child => {
-                if(child.texture && child.texture.key === 'tree1'){
-                    console.log("Arvore y: " + child.y);
-                    console.log("Arvore x: " + child.x);
-                }
                 return child.texture && child.texture.key === 'tree1' && child.y === 350  && child.x === (playerGridPos.x*gridSize)+(gridSize/2);
             });
 
             // Executa o movimento das faixas apenas se não houver árvore à frente do jogador
             if (!hasTreeInNextLane) {
                 moveLanesDown();
+                moveTrainsDown();
                 moveCarsDown();
                 increaseScore();
             }
@@ -477,6 +533,31 @@
             });
         }
 
+        function moveTrainsDown() {
+            // Definir a duração da transição em milissegundos
+            let transitionDuration = 300;
+
+            // Movimentar todos os trens para baixo com transição suave
+            trains.getChildren().forEach(train => {
+                let originalLaneY = train.y; // Armazenar a posição Y original do trem
+                let newLaneY = originalLaneY + gridSize; // Nova posição Y da faixa para o trem
+
+                gameScene.tweens.add({
+                    targets: train,
+                    y: newLaneY, // Nova posição Y do trem
+                    duration: transitionDuration, // Duração da transição
+                    ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                    onComplete: function () {
+                        // Callback opcional quando a transição estiver completa
+                        if (train.y > config.height + 1600 || train.y < -900) {
+                            train.destroy(); // Destruir o trem se estiver fora do canvas
+                        }
+                    }
+                });
+            });
+        }
+
+
         function moveTreeDown(tree) {
             // Definir a duração da transição em milissegundos
             let transitionDuration = 300;
@@ -505,9 +586,15 @@
             let lastLaneType = lanes.length > 0 ? lanes[0].texture.key : null;
             let laneType;
 
+            // Contar o número de faixas do tipo 'road' e 'trainroad'
+            let numRoads = lanes.filter(lane => lane.laneType === 'road').length;
+            let numTrainroads = lanes.filter(lane => lane.laneType === 'trainroad').length;
+
             // Se a última faixa foi uma calçada, gerar uma rua
             if (lastLaneType === 'sidewalk') {
                 laneType = 'road';
+            } else if (numRoads >= 3 && numTrainroads === 0) { // Se já houverem 3 faixas do tipo 'road' e não houver 'trainroad', gerar uma faixa 'trainroad'
+                laneType = 'trainroad';
             } else {
                 // Se a última faixa foi uma rua ou não houve faixas geradas ainda, escolher aleatoriamente entre rua e calçada
                 laneType = Phaser.Math.RND.pick(['road', 'sidewalk']);
@@ -522,6 +609,8 @@
             lanes.unshift(newLane); // Adicionar no início do array para que fique no topo
             spawnTrees(newLane);
         }
+
+
 
         function removeOffscreenLanes() {
             // Remover faixas que estão fora do canvas na borda inferior
