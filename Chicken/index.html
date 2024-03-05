@@ -302,32 +302,34 @@
             let trainRoadLanes = lanes.filter(lane => lane.texture.key === 'trainroad');
 
             trainRoadLanes.forEach(lane => {
-                // Verificar se a faixa selecionada é uma faixa de trem (trainroad)
-                if (lane && lane.texture.key === 'trainroad') {
-                    // Definir a posição X e a direção com base no atributo "direcao" da faixa
-                    let laneX, direction;
-                    if (lane.direction === 'esquerda') {
-                        laneX = 850;
-                        direction = -1; // Movendo para a esquerda
-                    } else {
-                        laneX = -50;
-                        direction = 1; // Movendo para a direita
-                    }
-
-                    // Verificar se é hora de spawnar um trem nesta faixa
-                        // Criar trem na faixa selecionada
-                        let train = trains.create(laneX, lane.y, 'train').setScale(0.15);
-                        train.setDepth(1);
-                        train.direction = direction; // Definir a direção do trem
-                        train.speed = carSpeed * 1.5; // Velocidade do trem é 1.5 vezes a velocidade do carro
-
-                        // Inverter a orientação do sprite se a direção for para a direita
-                        if (direction === 1) {
-                            train.setFlipX(true);      
-                            train.speed = (carSpeed* 1.5) * -1;
+                if (!isMovingLanes) {
+                    // Verificar se a faixa selecionada é uma faixa de trem (trainroad)
+                    if (lane && lane.texture.key === 'trainroad') {
+                        // Definir a posição X e a direção com base no atributo "direcao" da faixa
+                        let laneX, direction;
+                        if (lane.direction === 'esquerda') {
+                            laneX = 850;
+                            direction = -1; // Movendo para a esquerda
                         } else {
-                            train.speed = (carSpeed* 1.5);
+                            laneX = -50;
+                            direction = 1; // Movendo para a direita
                         }
+
+                        // Verificar se é hora de spawnar um trem nesta faixa
+                            // Criar trem na faixa selecionada
+                            let train = trains.create(laneX, lane.y, 'train').setScale(0.15);
+                            train.setDepth(1);
+                            train.direction = direction; // Definir a direção do trem
+                            train.speed = carSpeed * 1.5; // Velocidade do trem é 1.5 vezes a velocidade do carro
+
+                            // Inverter a orientação do sprite se a direção for para a direita
+                            if (direction === 1) {
+                                train.setFlipX(true);      
+                                train.speed = (carSpeed* 1.5) * -1;
+                            } else {
+                                train.speed = (carSpeed* 1.5);
+                            }
+                    }
                 }
             });
         }
