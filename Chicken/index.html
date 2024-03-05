@@ -308,10 +308,10 @@
                         // Definir a posição X e a direção com base no atributo "direcao" da faixa
                         let laneX, direction;
                         if (lane.direction === 'esquerda') {
-                            laneX = 850;
+                            laneX = 1100;
                             direction = -1; // Movendo para a esquerda
                         } else {
-                            laneX = -50;
+                            laneX = -300;
                             direction = 1; // Movendo para a direita
                         }
 
@@ -551,7 +551,7 @@
                     ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
                     onComplete: function () {
                         // Callback opcional quando a transição estiver completa
-                        if (train.y > config.height + 1600 || train.y < -900) {
+                        if (train.y > config.height + 2000 || train.y < -1300) {
                             train.destroy(); // Destruir o trem se estiver fora do canvas
                         }
                     }

@@ -92,8 +92,8 @@
             const background = this.add.image(400, 300, "background");
             background.setScale(game.config.width / background.width + 0.03, game.config.height / background.height);
 
-            const initialPlayerX = game.config.width / 2;
-            const initialPlayerY = game.config.height / 2;
+            const initialPlayerX = 350;
+            const initialPlayerY = 200;
 
             player = this.physics.add.sprite(initialPlayerX, initialPlayerY, "player");
             player.setBounce(0.2);
@@ -400,7 +400,7 @@
 
                 const bomb = bombs.create(bombX, bombY, 'bomb');
                 bomb.setBounce(1);
-                bomb.setScale(45 / bomb.width);
+                bomb.setScale(20 / bomb.width);
                 bomb.body.allowGravity = false;
             }
         }
@@ -421,7 +421,7 @@
 
                 const coin = coins.create(coinX, coinY, 'coin');
                 coin.setBounce(1);
-                coin.setScale(40 / coin.width);
+                coin.setScale(30 / coin.width);
                 coin.body.allowGravity = false;
             }
         }
