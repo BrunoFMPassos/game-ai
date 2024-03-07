@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower Defense em Marte</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0; /* Cor de fundo do corpo */
+        }
+
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        const config = {
+            type: Phaser.AUTO,
+            width: 1280,
+            height: 864,
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        function preload() {
+            // Carregar o fundo do canvas
+            this.load.image('background', 'images/background.png');
+
+            // Carregar outros recursos necessários, se houver
+        }
+
+        function create() {
+            // Adicionar o fundo ao canvas
+            this.add.image(0, 0, 'background').setOrigin(0); // Coloque o fundo na posição (0, 0) e defina a origem no canto superior esquerdo (0, 0)
+
+            // Adicionar barra lateral dentro do canvas
+            const sidebarWidth = 150;
+            const sidebar = this.add.container(0, 0).setDepth(1); // Garante que a barra lateral esteja acima de outros elementos do jogo
+
+            // Adicionar o fundo da barra lateral
+            const sidebarBackground = this.add.rectangle(0, 0, sidebarWidth, this.game.config.height, 0xD3D3D3,0.3).setOrigin(0); // Crie um retângulo com a cor desejada em hexadecimal
+            sidebar.add(sidebarBackground);
+
+            // Adicionar elementos da barra lateral (sprites)
+            const element1 = this.add.sprite(75, 100, 'element1').setInteractive({ draggable: true });
+            const element2 = this.add.sprite(75, 300, 'element2').setInteractive({ draggable: true });
+            const element3 = this.add.sprite(75, 500, 'element3').setInteractive({ draggable: true });
+
+            sidebar.add([element1, element2, element3]);
+
+            // Calcula o tamanho da célula
+            const cellWidth = (this.game.config.width - sidebarWidth) / 10;
+            const cellHeight = this.game.config.height / 9;
+
+            // Desenha a grade
+            for (let i = 0; i < 10; i++) {
+                for (let j = 0; j < 9; j++) {
+                    const cellX = sidebarWidth + i * cellWidth;
+                    const cellY = j * cellHeight;
+                    const cell = this.add.rectangle(cellX, cellY, cellWidth, cellHeight, 0xffffff, 0).setOrigin(0); // Defina a cor de preenchimento como branco com 0% de opacidade
+                    cell.setStrokeStyle(1, 0x000000);
+                }
+            }
+
+
+            // Habilitar o evento de arrastar e soltar na tela do jogo
+            this.input.on('dragstart', function (pointer, gameObject) {
+                gameObject.setTint(0xff0000); // Tint para indicar que o objeto está sendo arrastado
+            });
+
+            this.input.on('dragend', function (pointer, gameObject, dropped) {
+                if (!dropped) {
+                    gameObject.clearTint(); // Limpar a tint se o objeto não foi solto na tela do jogo
+                }
+            });
+
+            this.input.on('drop', function (pointer, gameObject) {
+                gameObject.clearTint(); // Limpar a tint ao soltar o objeto na tela do jogo
+                gameObject.setPosition(pointer.x, pointer.y);
+                // Aqui você pode adicionar lógica para criar elementos específicos na tela do jogo
+                // Por exemplo: criar torres, inimigos, etc.
+            });
+        }
+
+        function update() {
+            // Atualizações do jogo vão aqui
+        }
+    </script>
+</body>
+</html>

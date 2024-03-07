@@ -188,7 +188,7 @@
 
             // Criar loop de spawn de carros
              this.time.addEvent({
-                delay: 5000,
+                delay: 4000,
                 callback: spawnTrain,
                 callbackScope: this,
                 loop: true
@@ -325,9 +325,9 @@
                             // Inverter a orientação do sprite se a direção for para a direita
                             if (direction === 1) {
                                 train.setFlipX(true);      
-                                train.speed = (carSpeed* 1.5) * -1;
+                                train.speed = (carSpeed* 3) * -1;
                             } else {
-                                train.speed = (carSpeed* 1.5);
+                                train.speed = (carSpeed* 3);
                             }
                     }
                 }
