@@ -22,82 +22,221 @@
 </head>
 <body>
     <script>
+        let base; // Variável para armazenar a base
+        let inimigos; // Variável para armazenar os inimigos
+        let spawnTimer; // Timer para controle do spawn de inimigos
+        let vidaText; // Variável para armazenar o texto da vida da base
+
+        class MenuScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'MenuScene' });
+            }
+
+            preload() {
+                // Carregar a imagem de fundo do menu
+                this.load.image('menuBackground', 'images/menu-background.jpg');
+            }
+
+            create() {
+                // Adicionar o fundo ao canvas
+                this.add.image(0, 0, 'menuBackground').setOrigin(0); // Coloque o fundo na posição (0, 0) e defina a origem no canto superior esquerdo (0, 0)
+
+                // Adicionar botão de início
+                const startButton = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2, 'Iniciar', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+                startButton.setInteractive();
+
+                // Evento de clique no botão de início
+                startButton.on('pointerdown', () => {
+                    this.scene.start('MainScene');
+                });
+            }
+        }
+
+        class MainScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'MainScene' });
+            }
+
+            preload() {
+                // Carregar o fundo do canvas
+                this.load.image('background', 'images/background.png');
+                this.load.image('base', 'images/basic-base.png');
+                this.load.image('alien1', 'images/alien1.png'); // Carregar a imagem do inimigo
+                this.load.image('element1', 'images/element1.png'); // Carregar imagem para elemento 1
+                this.load.image('element2', 'images/element2.png'); // Carregar imagem para elemento 2
+                this.load.image('element3', 'images/element3.png'); // Carregar imagem para elemento 3
+            }
+
+            create() {
+                // Adicionar o fundo ao canvas
+                this.add.image(0, 0, 'background').setOrigin(0); // Coloque o fundo na posição (0, 0) e defina a origem no canto superior esquerdo (0, 0)
+
+                // Adicionar barra lateral dentro do canvas
+                const sidebarWidth = 150;
+                const sidebar = this.add.container(0, 0).setDepth(1); // Garante que a barra lateral esteja acima de outros elementos do jogo
+
+                // Adicionar o fundo da barra lateral
+                const sidebarBackground = this.add.rectangle(0, 0, sidebarWidth, this.game.config.height, 0xD3D3D3,0.3).setOrigin(0); // Crie um retângulo com a cor desejada em hexadecimal
+                sidebar.add(sidebarBackground);
+
+                // Adicionar elementos da barra lateral (sprites)
+                const element1 = this.add.sprite(75, 100, 'element1').setInteractive({ draggable: true });
+                const element2 = this.add.sprite(75, 300, 'element2').setInteractive({ draggable: true });
+                const element3 = this.add.sprite(75, 500, 'element3').setInteractive({ draggable: true });
+
+                sidebar.add([element1, element2, element3]);
+
+                // Calcula o tamanho da célula
+                const cellWidth = (this.game.config.width - sidebarWidth) / 10;
+                const cellHeight = this.game.config.height / 9;
+
+                // Desenha a grade
+                for (let i = 0; i < 10; i++) {
+                    for (let j = 0; j < 9; j++) {
+                        const cellX = sidebarWidth + i * cellWidth;
+                        const cellY = j * cellHeight;
+                        const cell = this.add.rectangle(cellX, cellY, cellWidth, cellHeight, 0xffffff, 0).setOrigin(0); // Defina a cor de preenchimento como branco com 0% de opacidade
+                        cell.setStrokeStyle(1, 0x000000,0.2);
+                    
+                    }
+                }
+
+                // Adiciona a base como um sprite
+                const baseX = sidebarWidth + (9 * cellWidth) / 2; // Posição X central
+                const baseY = (9 * cellHeight) / 2; // Posição Y central
+                base = this.add.sprite(baseX, baseY, 'base'); // Alterado de const para let
+                base.setOrigin(0.5); // Define o ponto de origem no centro do sprite
+
+                // Ajusta o tamanho do sprite para caber em um slot da grade
+                const scale = cellWidth / base.width; // Calcula a escala baseada na largura da célula
+                base.setScale(scale); // Define a escala do sprite
+
+                // Configura a vida da base
+                base.vida = 100;
+
+                // Adiciona um texto para exibir a vida da base
+                vidaText = this.add.text(10, 10, 'Vida: 100', { fontSize: '20px', fill: '#ffffff' });
+
+                // Habilita a física de colisão
+                this.physics.world.enable(base); // Habilita a física para a base
+
+                // Adicione seus inimigos ao grupo de inimigos (grupoInimigos)
+                inimigos = this.physics.add.group(); // Se você não tiver um grupo de inimigos, substitua inimigos por grupoInimigos
+
+                // Habilita a física de colisão para os inimigos
+                this.physics.world.enable(inimigos); // Habilita a física para os inimigos
+
+                // Adicione um timer para spawn de inimigos
+                spawnTimer = this.time.addEvent({
+                    delay: 3000, // 3 segundos (para teste, reduza o tempo de spawn)
+                    callback: spawnInimigo,
+                    callbackScope: this,
+                    loop: true // Repete indefinidamente
+                });
+            }
+
+            update() {
+                // Lógica de movimento dos inimigos em direção à base
+                inimigos.getChildren().forEach(inimigo => {
+                    // Calcula a diferença de posição entre o inimigo e a base
+                    const dx = base.x - inimigo.x;
+                    const dy = base.y - inimigo.y;
+
+                    // Verifica a direção dominante (horizontal ou vertical)
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        // Movimento horizontal
+                        const cellWidth = (this.game.config.width - 150) / 10; // Largura da célula
+                        const targetX = base.x; // Posição X da próxima célula na direção do movimento
+                        let direcionador = targetX - inimigo.x;
+                        let direcao = 1;
+                        if(direcionador < 0){
+                            direcao = -1;
+                        }
+                        inimigo.setVelocityX(150*direcao); // Define a velocidade horizontal para mover até a próxima célula
+                        inimigo.setVelocityY(0); // Mantém o movimento vertical como zero
+                    } else {
+                        // Movimento vertical
+                        const cellHeight = this.game.config.height / 9; // Altura da célula
+                        const targetY = base.y; // Posição Y da próxima célula na direção do movimento
+                        let direcionador = targetY - inimigo.y;
+                        let direcao = 1;
+                        if(direcionador < 0){
+                            direcao = -1;
+                        }
+                        inimigo.setVelocityX(0); // Mantém o movimento horizontal como zero
+                        inimigo.setVelocityY((150*direcao)); // Define a velocidade vertical para mover até a próxima célula
+                    }
+                });
+                // Lógica de atualização do jogo, incluindo a detecção de colisão entre inimigos e a base
+                this.physics.overlap(inimigos, base, (base, inimigo) => {
+                    inimigo.destroy(); // Destruir o inimigo
+                    base.vida -= 10; // Reduzir a vida da base
+                    updateLifeText(); // Atualizar o texto da vida da base
+                    if (base.vida <= 0) {
+                        this.scene.start('MenuScene');
+                    }
+                });
+            }
+        }
+
+        // Função para atualizar o texto da vida da base
+        function updateLifeText() {
+            vidaText.setText('Vida: ' + base.vida);
+        }
+
+        function spawnInimigo() {
+            // Gera coordenadas aleatórias para spawn dos inimigos dentro das bordas do canvas
+            const cellWidth = (this.game.config.width - 150) / 10; // Largura da célula
+            const cellHeight = this.game.config.height / 9; // Altura da célula
+            const spawnX = Phaser.Math.RND.between(10, game.config.width - 10); // Coordenada X dentro da área jogável
+            const spawnY = Phaser.Math.RND.between(10, game.config.height - 10); // Coordenada Y dentro da área jogável
+
+            // Calcula a célula mais próxima a partir das coordenadas de spawn
+            const cellX = Math.floor((spawnX - 10) / cellWidth) * cellWidth + 10 + cellWidth / 2; // Calcula o centro da célula na direção X
+            const cellY = Math.floor(spawnY / cellHeight) * cellHeight + cellHeight / 2; // Calcula o centro da célula na direção Y
+
+            // Cria um novo inimigo no centro da célula calculada
+            const inimigo = this.physics.add.sprite(cellX, cellY, 'alien1'); // 'alien1' é a chave do sprite do inimigo
+            inimigo.setOrigin(0.5); // Define o ponto de origem no centro do sprite
+
+            // Ajusta o tamanho do sprite para metade de um slot da grid
+            const scale = Math.min(cellWidth, cellHeight) / 2 / Math.max(inimigo.width, inimigo.height); // Calcula a escala baseada na menor dimensão
+            inimigo.setScale(scale); // Define a escala do sprite
+
+            // Configura a vida inicial dos inimigos
+            inimigo.vida = 20;
+
+            // Adiciona o inimigo ao grupo de inimigos
+            inimigos.add(inimigo);
+
+            // Habilita a interação de clique nos inimigos
+            inimigo.setInteractive();
+            inimigo.on('pointerdown', function() {
+                // Ao clicar no inimigo, reduz sua vida em 5 pontos
+                inimigo.vida -= 5;
+
+                // Se a vida do inimigo chegar a 0, destrua-o
+                if (inimigo.vida <= 0) {
+                    inimigo.destroy();
+                }
+            });
+        }
+
+
         const config = {
             type: Phaser.AUTO,
             width: 1280,
             height: 864,
-            scene: {
-                preload: preload,
-                create: create,
-                update: update
-            }
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    debug: false // Defina como true se quiser ver as colisões na tela para fins de depuração
+                }
+            },
+            scene: [MenuScene, MainScene]
         };
 
         const game = new Phaser.Game(config);
-
-        function preload() {
-            // Carregar o fundo do canvas
-            this.load.image('background', 'images/background.png');
-
-            // Carregar outros recursos necessários, se houver
-        }
-
-        function create() {
-            // Adicionar o fundo ao canvas
-            this.add.image(0, 0, 'background').setOrigin(0); // Coloque o fundo na posição (0, 0) e defina a origem no canto superior esquerdo (0, 0)
-
-            // Adicionar barra lateral dentro do canvas
-            const sidebarWidth = 150;
-            const sidebar = this.add.container(0, 0).setDepth(1); // Garante que a barra lateral esteja acima de outros elementos do jogo
-
-            // Adicionar o fundo da barra lateral
-            const sidebarBackground = this.add.rectangle(0, 0, sidebarWidth, this.game.config.height, 0xD3D3D3,0.3).setOrigin(0); // Crie um retângulo com a cor desejada em hexadecimal
-            sidebar.add(sidebarBackground);
-
-            // Adicionar elementos da barra lateral (sprites)
-            const element1 = this.add.sprite(75, 100, 'element1').setInteractive({ draggable: true });
-            const element2 = this.add.sprite(75, 300, 'element2').setInteractive({ draggable: true });
-            const element3 = this.add.sprite(75, 500, 'element3').setInteractive({ draggable: true });
-
-            sidebar.add([element1, element2, element3]);
-
-            // Calcula o tamanho da célula
-            const cellWidth = (this.game.config.width - sidebarWidth) / 10;
-            const cellHeight = this.game.config.height / 9;
-
-            // Desenha a grade
-            for (let i = 0; i < 10; i++) {
-                for (let j = 0; j < 9; j++) {
-                    const cellX = sidebarWidth + i * cellWidth;
-                    const cellY = j * cellHeight;
-                    const cell = this.add.rectangle(cellX, cellY, cellWidth, cellHeight, 0xffffff, 0).setOrigin(0); // Defina a cor de preenchimento como branco com 0% de opacidade
-                    cell.setStrokeStyle(1, 0x000000);
-                }
-            }
-
-
-            // Habilitar o evento de arrastar e soltar na tela do jogo
-            this.input.on('dragstart', function (pointer, gameObject) {
-                gameObject.setTint(0xff0000); // Tint para indicar que o objeto está sendo arrastado
-            });
-
-            this.input.on('dragend', function (pointer, gameObject, dropped) {
-                if (!dropped) {
-                    gameObject.clearTint(); // Limpar a tint se o objeto não foi solto na tela do jogo
-                }
-            });
-
-            this.input.on('drop', function (pointer, gameObject) {
-                gameObject.clearTint(); // Limpar a tint ao soltar o objeto na tela do jogo
-                gameObject.setPosition(pointer.x, pointer.y);
-                // Aqui você pode adicionar lógica para criar elementos específicos na tela do jogo
-                // Por exemplo: criar torres, inimigos, etc.
-            });
-        }
-
-        function update() {
-            // Atualizações do jogo vão aqui
-        }
     </script>
 </body>
 </html>
