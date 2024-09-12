@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chicken</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #523453;
+        }
+
+        #game {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .lane {
+            border: 1px solid red !important;
+        }
+
+          /* Estiliza a div do ranking */
+          #ranking {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            width: 200px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            border-radius: 5px;
+        }
+    
+        #ranking h3 {
+            margin-top: 0;
+            font-size: 16px;
+            text-align: center;
+        }
+    
+        #rankingList {
+            list-style: none; /* Remove os marcadores da lista padrão */
+            padding: 0;
+            margin: 0;
+        }
+    
+        #rankingList li {
+            display: flex;
+            justify-content: space-between; /* Nome à esquerda e pontuação à direita */
+            padding: 5px;
+            margin-bottom: 5px;
+            background-color: rgba(255, 255, 255, 0.1); /* Fundo leve para os itens */
+            border-radius: 3px;
+        }
+    
+        /* Destaque para os três primeiros colocados */
+        #rankingList li:nth-child(1) {
+            font-weight: bold;
+            color: gold;
+        }
+    
+        #rankingList li:nth-child(2) {
+            font-weight: bold;
+            color: silver;
+        }
+    
+        #rankingList li:nth-child(3) {
+            font-weight: bold;
+            color: #cd7f32; /* Bronze */
+        }
+    
+        /* Numeração automática dos itens */
+        #rankingList li::before {
+            content: counter(item) ". "; /* Exibe a numeração */
+            counter-increment: item; /* Incrementa o contador */
+            margin-right: 5px;
+            font-weight: bold;
+        }
+    
+        #rankingList {
+            counter-reset: item; /* Reinicia o contador */
+        }
+    
+        /* Formulário de entrada */
+        #playerNameForm {
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+        }
+    
+        #playerNameForm input {
+            margin: 10px 0;
+            padding: 5px;
+        }
+    
+        /* Estilo para a div de instruções */
+        #instructions {
+            position: absolute;
+            left: 5px;
+            top: 10px;
+            width: 220px;
+            padding: 5px;
+            background-color: rgba(255, 255, 255, 0.8);
+            color: #333;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+    
+        #instructions h3 {
+            margin-top: 0;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            color: #000;
+        }
+    
+        #instructions ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            line-height: 1.6;
+        }
+    
+        #instructions ul li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+    
+        #instructions ul li::before {
+            content: '✔'; /* Usando um símbolo de check para cada instrução */
+            margin-right: 8px;
+            color: #2ecc71;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game"></div>
+    
+    <div id="ranking">
+        <h3>Ranking</h3>
+        <ul id="rankingList"></ul>
+    </div>
+
+    <!-- Div de Instruções -->
+    <div id="instructions">
+        <h3>Instruções</h3>
+        <ul>
+            <li>Pressione Espaço para ir pra frente 🐔</li>
+            <li>Pressione as setas<strong>⬅️➡️</strong>para mover</li>
+            <li>Evite os veículos 🚗</li>
+        </ul>
+    </div>
+
+    <!-- Formulário para entrada do nome -->
+    <div id="playerNameForm">
+        <label for="playerName">Digite seu nome:</label>
+        <input type="text" id="playerName" placeholder="Seu nome">
+    </div>
+
+    <script>
+        let gameScene = new Phaser.Scene('Game');
+        let startScene = new Phaser.Scene('Start');
+
+        let config = {
+            type: Phaser.AUTO,
+            parent: 'game',
+            width: 800,
+            height: 600,
+            scene: [startScene, gameScene], // Adicionando a cena de início antes da cena do jogo
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    debug: false
+                }
+            }
+        };
+
+        let game = new Phaser.Game(config);
+
+        let player;
+        let cars;
+        let trains;
+        let trees;
+        let lanes = [];
+        let cursors;
+        let carSpeed = 5;
+        let lastCarIndex = -1; 
+        let alive = true;
+        let gameOver = false;
+        let gridSize = 100; // Tamanho da célula da grade
+        let playerGridPos; // posição da galinha na grade
+        let roadSegments = 5; // Número inicial de segmentos de estrada visíveis
+        let roadSegmentHeight = 100; // Altura de cada segmento de estrada
+        let nextRoadSegmentY = roadSegments * roadSegmentHeight; // Próxima posição Y para gerar estrada
+        let score = 0; // Variável para armazenar a score do jogador
+        let scoreText; // Texto de score
+        let successfulCrossings = 0; // Contador de trocas de faixa bem-sucedidas
+        let maxCarSpeed = 10; // Velocidade máxima dos carros
+        let lastMoveTime = 0;
+        const moveInterval = 550; // Intervalo mínimo de 1 segundo entre as execuções
+        let isMovingLanes = false;
+        let playerName = "";
+
+        loadRanking("galinha");
+
+
+        startScene.preload = function () {
+            // Preload da cena de início, se necessário
+            this.load.image('background', 'images/background.png');
+        };
+
+        startScene.create = function () {
+            // Criar cena de início
+            let background = this.add.image(400, 300, 'background').setOrigin(0.5);
+            background.displayWidth = config.width;
+            background.displayHeight = config.height;
+            
+            let startButton = this.add.text(400, 400, 'Start Game', {
+                fontSize: '32px',
+                fill: '#ffffff',
+                backgroundColor: '#008CBA',
+                padding: {
+                    x: 20,
+                    y: 10
+                }
+            }).setOrigin(0.5);
+            startButton.setInteractive(); // Tornar o botão interativo
+            startButton.setName('startButton'); // Atribuir um nome ao botão
+
+            if(localStorage.getItem('player') != undefined && localStorage.getItem('player') != ""){
+                document.getElementById('playerNameForm').style.display = 'none';
+            }else{
+                document.getElementById('playerNameForm').style.display = 'flex';
+            }
+
+            startButton.on('pointerdown', () => {
+                playerName = document.getElementById('playerName').value;
+                document.getElementById('playerNameForm').style.display = 'none';
+                localStorage.setItem('player', playerName);
+                this.scene.start('Game'); // Iniciar a cena do jogo ao clicar no botão
+            });
+            const enterKey = game.scene.scenes[0].input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+            enterKey.on('down', () => {
+                playerName = document.getElementById('playerName').value;
+                document.getElementById('playerNameForm').style.display = 'none';
+                localStorage.setItem('player', playerName)
+                this.scene.start('Game'); // Iniciar a cena do jogo ao pressionar enter
+            });
+        };
+
+        gameScene.preload = function () {
+            this.load.image('chicken', 'images/chicken.png');
+            this.load.image('car1', 'images/car1.png');
+            this.load.image('car2', 'images/car2.png');
+            this.load.image('car3', 'images/car3.png');
+            this.load.image('car4', 'images/car4.png');
+            this.load.image('car5', 'images/car5.png');
+            this.load.image('car6', 'images/car6.png');
+            this.load.image('train', 'images/train.png');
+            this.load.image('road', 'images/road3.png');
+            this.load.image('trainroad', 'images/trainroad.png');
+            this.load.image('tree1', 'images/tree1.png'); // Nova imagem para a árvore
+            this.load.image('sidewalk', 'images/sidewalk3.png');
+            this.load.image('background3', 'images/background3.png');
+        };
+        
+        gameScene.create = function () {
+
+            let self = this;
+            // Remover o botão de início se já estiver presente
+            let startButton = this.children.getByName('startButton');
+            if (startButton) {
+                startButton.destroy();
+            }
+
+            let background = this.add.image(400, 300, 'background3').setOrigin(0.5);
+            background.displayWidth = config.width;
+            background.displayHeight = config.height;
+
+            // Exibir a score na tela
+            scoreText = this.add.text(20, 20, 'score: 0', { fontSize: '24px', fill: '#fff' });
+            scoreText.setDepth(1);
+            // Criar faixas de estrada e calçada
+            for (let i = 0; i < roadSegments; i++) {
+                let lane;
+                if (i % 2 === 0) {
+                    lane = this.add.image(400, i * roadSegmentHeight + roadSegmentHeight / 2, 'sidewalk').setOrigin(0.5, 0.5);
+                } else {
+                    lane = this.add.image(400, i * roadSegmentHeight + roadSegmentHeight / 2, 'road').setOrigin(0.5, 0.5);
+                }
+                lane.displayHeight = gridSize;
+                lane.displayWidth = 850;
+                lane.direction = 'direita';
+                lanes.push(lane);
+            }
+
+            // Adicionar carros
+            cars = this.physics.add.group();
+
+            trains = this.physics.add.group();
+
+            // Adicionar galinha
+            player = this.physics.add.sprite(400, 450, 'chicken').setScale(0.05);
+            player.setDepth(1);
+            // Definir posição inicial na grade
+            playerGridPos = { x: 3.5, y: 5 };
+
+            // Configurar controles do teclado
+            cursors = this.input.keyboard.createCursorKeys();
+
+            // Detectar colisão entre galinha e carros
+            this.physics.add.collider(player, cars, hitByCar, null, this);
+            this.physics.add.collider(player, trains, hitByCar, null, this);
+
+            // Criar loop de spawn de carros
+            this.time.addEvent({
+                delay: 500,
+                callback: spawnCar,
+                callbackScope: this,
+                loop: true
+            });
+
+            // Criar loop de spawn de carros
+             this.time.addEvent({
+                delay: 4000,
+                callback: spawnTrain,
+                callbackScope: this,
+                loop: true
+            });
+
+            // Adiciona um evento de teclado para movimentar faixas para baixo
+            this.input.keyboard.on('keydown-SPACE', function () {
+                // Obtém o tempo atual
+                let currentTime = gameScene.time.now;
+
+                // Verifica se o tempo decorrido desde a última execução é maior que o intervalo mínimo
+                if (currentTime - lastMoveTime >= moveInterval && alive) {
+                    if(!isMovingLanes){
+                        // Executa o movimento das faixas e carros
+                        moveLanesAnCarsDownIfNoTreeInNextLane();
+                        //moveLanesDown();
+                        carSpeed += score / 1000;
+                        // Atualiza o tempo da última execução
+                        lastMoveTime = currentTime;
+                    }
+                }
+            });
+
+            // Configurar controles do teclado
+            moveLeftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+            moveRightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+        };
+
+        gameScene.update = function () {
+            // Verificar estado do jogo
+            if (gameOver) return;
+
+            // Controlar movimento da galinha
+            player.setVelocity(0);
+
+            // Detectar clique de teclas para movimentação
+            if (Phaser.Input.Keyboard.JustDown(moveLeftKey)) {
+                if ((playerGridPos.x-1) > 0) {
+                    updatePlayerPosition("left");
+                }
+            } else if (Phaser.Input.Keyboard.JustDown(moveRightKey)) {
+                if ((playerGridPos.x+1) < 7) { // Limite da grade do eixo x
+                    updatePlayerPosition("right");
+                }
+            }
+
+            // Movimentar carros
+            cars.getChildren().forEach(car => {
+                car.x -= car.speed * this.physics.world.timeScale;
+
+                if (car.x < -100 || car.x > 900) {
+                    car.destroy();
+                }
+            });
+
+            // Movimentar trens
+            trains.getChildren().forEach(train => {
+                train.x -= train.speed * this.physics.world.timeScale;
+
+                if (train.x < -900 || train.x > 1700) {
+                    train.destroy();
+                }
+            });
+
+        };
+
+
+        function spawnCar() {
+            // Selecionar um índice de faixa de estrada (road)
+            let roadLanes = lanes.filter(lane => lane.texture.key === 'road'); // Filtrar apenas as faixas que são estradas
+
+            roadLanes.forEach(lane => {
+                if (!isMovingLanes) {
+                    // Verificar se a faixa selecionada é uma faixa de rua (road)
+                    if (lane && lane.texture.key === 'road') {
+
+                        // Definir a posição X e a direção com base no atributo "direcao" da faixa
+                        let laneX, direction;
+                        if (lane.direction === 'esquerda') {
+                            laneX = 800;
+                            direction = -1; // Movendo para a esquerda
+                        } else {
+                            laneX = 0;
+                            direction = 1; // Movendo para a direita
+                        }
+
+                        // Verificar a posição do último carro na faixa para manter a distância mínima
+                        let lastCarInLane = cars.getChildren().find(car => car.y === lane.y && car.direction === direction);
+                        if (!lastCarInLane || (direction === -1 && lastCarInLane.x - laneX >= 50) || (direction === 1 && laneX - lastCarInLane.x >= 50)) {
+                            // Criar carro na faixa selecionada
+                            let carIndex = Phaser.Math.Between(1, 6); // Índices de 1 a 6 para corresponder aos arquivos car1.png até car6.png
+                            let car = cars.create(laneX, lane.y, 'car' + carIndex).setScale(0.07);
+                            car.setDepth(1);
+                            car.direction = direction; // Definir a direção do carro
+
+                            // Inverter a orientação do sprite se a direção for para a direita
+                            if (direction === 1) {
+                                car.setFlipX(true);
+                                car.speed = carSpeed * -1;
+                            } else {
+                                car.speed = carSpeed;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function spawnTrain() {
+            // Selecionar as faixas de trem (trainroad)
+            let trainRoadLanes = lanes.filter(lane => lane.texture.key === 'trainroad');
+
+            trainRoadLanes.forEach(lane => {
+                if (!isMovingLanes) {
+                    // Verificar se a faixa selecionada é uma faixa de trem (trainroad)
+                    if (lane && lane.texture.key === 'trainroad') {
+                        // Definir a posição X e a direção com base no atributo "direcao" da faixa
+                        let laneX, direction;
+                        if (lane.direction === 'esquerda') {
+                            laneX = 1100;
+                            direction = -1; // Movendo para a esquerda
+                        } else {
+                            laneX = -300;
+                            direction = 1; // Movendo para a direita
+                        }
+
+                        // Verificar se é hora de spawnar um trem nesta faixa
+                            // Criar trem na faixa selecionada
+                            let train = trains.create(laneX, lane.y, 'train').setScale(0.15);
+                            train.setDepth(1);
+                            train.direction = direction; // Definir a direção do trem
+                            train.speed = carSpeed * 1.5; // Velocidade do trem é 1.5 vezes a velocidade do carro
+
+                            // Inverter a orientação do sprite se a direção for para a direita
+                            if (direction === 1) {
+                                train.setFlipX(true);      
+                                train.speed = (carSpeed* 3) * -1;
+                            } else {
+                                train.speed = (carSpeed* 3);
+                            }
+                    }
+                }
+            });
+        }
+
+
+        function spawnTrees(lane) {
+            // Spawn de árvores nas calçadas
+            if (lane.laneType == "sidewalk") {
+                // Array para armazenar as posições X das árvores nesta faixa de calçada
+                let treePositionsX = [];
+
+                // Preenche o array com as posições X das árvores já existentes nesta faixa
+                gameScene.children.each(child => {
+                    // Verifica se o objeto é uma árvore e está na mesma faixa de calçada
+                    if (child.texture && child.texture.key === 'tree1' && child.y === lane.y) {
+                        treePositionsX.push(child.x);
+                    }
+                });
+
+                // Calcula o número aleatório de árvores entre 1 e 3
+                let numTrees = Phaser.Math.Between(1, 3);
+
+                // Loop para criar e posicionar as árvores
+                for (let i = 0; i < numTrees; i++) {
+                    // Variável para armazenar a posição X da nova árvore
+                    let treeX;
+
+                    // Loop para garantir que a nova posição X não se sobreponha a uma árvore existente
+                    do {
+                        // Calcula uma posição X aleatória dentro da faixa de calçada
+                        treeX = Phaser.Math.Between(50, 600);
+                        // Arredonda para o múltiplo de 50 mais próximo
+                        treeX = Math.round(treeX / 100) * 100;
+                    } while (treePositionsX.some(positionX => Math.abs(positionX - treeX) < 100)); // Verifica se a nova árvore está muito próxima de uma árvore existente
+
+                    // Atualiza o array de posições X das árvores nesta faixa de calçada
+                    treePositionsX.push(treeX);
+
+                    // Cria a árvore na posição calculada
+                    let tree = gameScene.add.image(treeX, lane.y, 'tree1').setScale(0.06);
+                    tree.setDepth(1);
+                }
+            }
+        }
+
+
+
+        // Função para colisão com carros e faixas
+        function hitByCar(player, obstacle) {
+            if (obstacle.texture.key === 'car1' || obstacle.texture.key === 'car2' || obstacle.texture.key === 'car3' || obstacle.texture.key === 'car4' || obstacle.texture.key === 'car5' || obstacle.texture.key === 'car6' || obstacle.texture.key === 'train') {
+                alive = false;
+                gameOver = true;
+                gameScene.add.text(400, 300, 'Game Over', {
+                    fontSize: '70px',
+                    fill: '#ff0000'
+                }).setOrigin(0.5).setDepth(1);
+
+                // Pausar a física do jogo
+                //gameScene.physics.pause();
+
+
+                // Aplicar força aleatória à galinha para simular "voar"
+                direction_obstacle = obstacle.direction; // Definir a direção do carro
+
+                sendScoreToServer("galinha", localStorage.getItem('player') , score);
+
+                // Inverter a orientação do sprite se a direção for para a direita
+                let multiplicador = 1;
+                if (direction_obstacle != 1) {
+                    multiplicador = -1;
+                }
+                let forceX = Phaser.Math.Between(500*multiplicador, 3000*multiplicador); // Força aleatória no eixo X
+                let forceY = Phaser.Math.Between(500*multiplicador, 1800*multiplicador); // Força aleatória no eixo Y
+                player.setVelocity(forceX, forceY);
+                // Aplicar uma rotação aleatória à galinha
+                let angularVelocity = Phaser.Math.Between(-720, 720); // Velocidade angular aleatória
+                player.setAngularVelocity(angularVelocity);
+                // Impedir que a galinha ultrapasse as bordas do canvas
+                player.setCollideWorldBounds(true);
+                // Definir a velocidade dos carros para zero após a colisão com a galinha
+                obstacle.setVelocity(0);
+
+                // Reiniciar o jogo após um atraso de 2 segundos
+                gameScene.time.delayedCall(2000, function () {
+                    // Se o jogador morreu, reiniciar o contador de trocas de faixa bem-sucedidas
+                    gameOver = false;
+                    alive = true;
+                    score = 0;
+                    carSpeed = 5;
+                    lanes = [];
+                    gameScene.scene.start('Start'); // Redirecionar para a cena inicial
+                }, [], gameScene);
+            }
+        }
+
+        function updatePlayerPosition(position) {
+            // Calcula a próxima posição horizontal do jogador com base na direção do movimento
+            let nextPlayerX = playerGridPos.x + (position == "right" ? 1 : -1);
+            // Verifica se há uma árvore na próxima posição (mesma linha e próxima coluna)
+            let currentLane = lanes[playerGridPos.y];
+            let nextLaneX = nextPlayerX * gridSize + gridSize / 2;
+            let hasTreeInNextPosition = gameScene.children.list.some(child => {
+                //return child.texture && child.texture.key === 'tree1' && child.y === currentLane.y && Math.abs(child.x - nextLaneX) < gridSize / 2;
+                return child.texture && child.texture.key === 'tree1' && child.y === 450  && child.x === (nextPlayerX*gridSize)+(gridSize/2);
+            });
+
+            // Atualiza a posição do jogador apenas se não houver árvore na próxima posição em X
+            if (!hasTreeInNextPosition) {
+                //playerGridPos.x = nextPlayerX;
+                if(position == "left"){
+                    playerGridPos.x--;
+                    player.x = playerGridPos.x * gridSize + gridSize / 2;
+                }else if(position == "right"){
+                    playerGridPos.x++;
+                    player.x = playerGridPos.x * gridSize + gridSize / 2;
+                }
+            }
+        }
+
+
+
+        function moveLanesAnCarsDownIfNoTreeInNextLane() {
+            // Calcula a posição exata da próxima faixa horizontal
+            // Verifica se há uma árvore exatamente à frente do jogador
+            var teste = (playerGridPos.x*gridSize)+(gridSize/2);
+
+            let hasTreeInNextLane = gameScene.children.list.some(child => {
+                return child.texture && child.texture.key === 'tree1' && child.y === 350  && child.x === (playerGridPos.x*gridSize)+(gridSize/2);
+            });
+
+            // Executa o movimento das faixas apenas se não houver árvore à frente do jogador
+            if (!hasTreeInNextLane) {
+                moveLanesDown();
+                moveTrainsDown();
+                moveCarsDown();
+                increaseScore();
+            }
+        }
+
+
+
+        function moveLanesDown() {
+            if (!isMovingLanes){
+                // Definir a duração da transição em milissegundos
+                let transitionDuration = 300;
+                isMovingLanes = true; // Define que o movimento está ocorrendo
+                // Movimentar todas as faixas para baixo com transição suave
+                lanes.forEach(function (lane) {
+                    gameScene.tweens.add({
+                        targets: lane,
+                        y: lane.y + gridSize, // Nova posição Y
+                        duration: transitionDuration, // Duração da transição
+                        ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                        onComplete: function () {
+                            isMovingLanes = false; // Define que o movimento terminou quando a animação é concluída
+                        }
+                    });
+            
+                    // Percorre todos os objetos na cena
+                    gameScene.children.each(function (child) {
+                        // Verifica se o objeto é uma árvore (você precisa ajustar essa verificação conforme a estrutura do seu código)
+                        if (child.texture && child.texture.key === 'tree1') {
+                            // Imprime a posição x da árvore
+                            moveTreeDown(child);
+                        }
+                    });
+                });
+                // Gerar uma nova faixa no topo do canvas
+                generateNewLane();
+                // Remover faixas que estão fora do canvas na borda inferior
+                removeOffscreenLanes();
+
+                // Atualizar a próxima posição Y para gerar uma nova faixa
+                nextRoadSegmentY += roadSegmentHeight;
+            }
+        }
+
+
+        function moveCarsDown() {
+            // Definir a duração da transição em milissegundos
+            let transitionDuration = 300;
+
+            // Movimentar todos os carros para baixo com transição suave
+            cars.getChildren().forEach(car => {
+                let originalLaneY = car.y; // Armazenar a posição Y original do carro
+                let newLaneY = originalLaneY + gridSize; // Nova posição Y da faixa para o carro
+
+                gameScene.tweens.add({
+                    targets: car,
+                    y: newLaneY, // Nova posição Y do carro
+                    duration: transitionDuration, // Duração da transição
+                    ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                    onComplete: function () {
+                        // Callback opcional quando a transição estiver completa
+                        if (car.y > config.height + 100 || car.y < -100) {
+                            car.destroy(); // Destruir o carro se estiver fora do canvas
+                        }
+                    }
+                });
+            });
+        }
+
+        function moveTrainsDown() {
+            // Definir a duração da transição em milissegundos
+            let transitionDuration = 300;
+
+            // Movimentar todos os trens para baixo com transição suave
+            trains.getChildren().forEach(train => {
+                let originalLaneY = train.y; // Armazenar a posição Y original do trem
+                let newLaneY = originalLaneY + gridSize; // Nova posição Y da faixa para o trem
+
+                gameScene.tweens.add({
+                    targets: train,
+                    y: newLaneY, // Nova posição Y do trem
+                    duration: transitionDuration, // Duração da transição
+                    ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                    onComplete: function () {
+                        // Callback opcional quando a transição estiver completa
+                        if (train.y > config.height + 2000 || train.y < -1300) {
+                            train.destroy(); // Destruir o trem se estiver fora do canvas
+                        }
+                    }
+                });
+            });
+        }
+
+
+        function moveTreeDown(tree) {
+            // Definir a duração da transição em milissegundos
+            let transitionDuration = 300;
+
+            // Movimentar todos os carros para baixo com transição suave
+                let originalLaneY = tree.y; // Armazenar a posição Y original do carro
+                let newLaneY = originalLaneY  + gridSize; // Nova posição Y da faixa para o carro
+
+                gameScene.tweens.add({
+                    targets: tree,
+                    y: newLaneY, // Nova posição Y do carro
+                    duration: transitionDuration, // Duração da transição
+                    ease: 'Linear', // Tipo de suavização (linear para movimento uniforme)
+                    onComplete: function () {
+                        // Callback opcional quando a transição estiver completa
+                        if (tree.y > config.height + 100 || tree.y < -100) {
+                            tree.destroy(); // Destruir o carro se estiver fora do canvas
+                        }
+                    }
+                });
+        }
+
+
+        function generateNewLane() {
+            // Verificar a última faixa gerada para garantir que não seja uma calçada
+            let lastLaneType = lanes.length > 0 ? lanes[0].texture.key : null;
+            let laneType;
+
+            // Contar o número de faixas do tipo 'road' e 'trainroad'
+            let numRoads = lanes.filter(lane => lane.laneType === 'road').length;
+            let numTrainroads = lanes.filter(lane => lane.laneType === 'trainroad').length;
+
+            // Se a última faixa foi uma calçada, gerar uma rua
+            if (lastLaneType === 'sidewalk') {
+                laneType = 'road';
+            } else if (numRoads >= 3 && numTrainroads === 0) { // Se já houverem 3 faixas do tipo 'road' e não houver 'trainroad', gerar uma faixa 'trainroad'
+                laneType = 'trainroad';
+            } else {
+                // Se a última faixa foi uma rua ou não houve faixas geradas ainda, escolher aleatoriamente entre rua e calçada
+                laneType = Phaser.Math.RND.pick(['road', 'sidewalk']);
+            }
+
+            let newLane = gameScene.add.image(400, -gridSize / 2, laneType).setOrigin(0.5, 0.5);
+            newLane.displayHeight = gridSize;
+            newLane.displayWidth = 850;
+            newLane.laneType = laneType;
+            let direction = Phaser.Math.RND.pick(['esquerda', 'direita']); // Aleatoriamente escolhe 'esquerda' ou 'direita' para a direção da faixa
+            newLane.direction = direction; // Adicionando o atributo direcao à faixa
+            lanes.unshift(newLane); // Adicionar no início do array para que fique no topo
+            spawnTrees(newLane);
+        }
+
+
+
+        function removeOffscreenLanes() {
+            // Remover faixas que estão fora do canvas na borda inferior
+            for (let i = 0; i < lanes.length; i++) {
+                if (lanes[i].y > 600) {
+                    lanes[i].destroy();
+                    lanes.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        function increaseScore() {
+            // Aumentar a score
+            score += 5;
+            // Atualizar o texto da score na tela
+            scoreText.setText('score: ' + score);
+        }
+
+                // Função para enviar o nome e a pontuação para o servidor
+                function sendScoreToServer(game, playerName, score) {
+            fetch(`http://localhost:3000/ranking/${game}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: playerName, score: score })
+            }).then(response => response.json())
+            .then(data => {
+                console.log("Score enviado com sucesso", data);
+                loadRanking(game); // Atualiza o ranking após enviar a pontuação
+            }).catch(error => {
+                console.error("Erro ao enviar score", error);
+            });
+        }
+
+
+        // Função para carregar o ranking do servidor
+        function loadRanking(game) {
+            fetch(`http://localhost:3000/ranking/${game}`)
+                .then(response => response.json())
+                .then(data => {
+                    const rankingList = document.getElementById('rankingList');
+                    rankingList.innerHTML = ''; // Limpa o ranking atual
+
+                    data.forEach(player => {
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `<span>${player.name}</span><span>${player.score}</span>`;
+                        rankingList.appendChild(listItem);
+                    });
+                }).catch(error => {
+                    console.error("Erro ao carregar ranking", error);
+                });
+        }
+
+    </script>
+</body>
+
+</html>

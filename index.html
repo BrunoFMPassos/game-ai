@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Game Experience</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Adicionando ícones com Font Awesome -->
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <style>
+    /* Gradiente de fundo mais escuro */
+    body {
+      background: linear-gradient(135deg, #220529, #4b1270, #831168);
+      background-size: 200% 200%;
+      animation: gradientAnimation 10s ease infinite;
+      overflow: hidden;
+      position: relative;
+    }
+
+    @keyframes gradientAnimation {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Estilo do cursor visível como uma bolinha menor */
+    .custom-cursor {
+      width: 12px;
+      height: 12px;
+      background-color: #200726; /* Tom bem escuro de roxo */
+      border-radius: 50%;
+      position: fixed;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 10000;
+    }
+
+    /* Efeito de traçado estilo linha neon */
+    .neon-trail {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      background-color: rgba(255, 0, 255, 0.8);
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255, 0, 255, 0.6), 0 0 20px rgba(255, 0, 255, 0.5);
+      pointer-events: none;
+      animation: fadeOut 0.8s forwards;
+    }
+
+    @keyframes fadeOut {
+      to {
+        opacity: 0;
+        transform: scale(2.5);
+      }
+    }
+
+    /* Remover o cursor padrão */
+    * {
+      cursor: none;
+    }
+
+    /* Estilo da interrogação */
+    .help-icon {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 24px;
+      cursor: pointer;
+      color: white;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 50px;
+      padding: 8px;
+      transition: background-color 0.3s;
+    }
+
+    .help-icon:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Estilo da modal explicativa */
+    .help-modal {
+      position: absolute;
+      top: 20px;
+      right: 50px;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 550px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+      z-index: 9999;
+    }
+
+    .help-modal.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Adicionar imagens aos cards */
+    .card-image {
+      max-height: 150px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center text-white">
+
+  <!-- Cursor personalizado -->
+  <div id="custom-cursor" class="custom-cursor"></div>
+
+  <!-- Interrogação no canto superior direito -->
+  <div class="help-icon" id="help-icon">?</div>
+  <div class="help-modal" id="help-modal">
+    <h3><i class="fas fa-gamepad"></i><strong> Projeto de Desenvolvimento de Jogos Web com IA</strong></h3>
+    <br>
+    <ul>
+        <li>
+            <i class="fas fa-bullseye"></i>
+            <p><strong>Objetivo:</strong> Este projeto teve como objetivo explorar o desenvolvimento de jogos web simples utilizando Inteligência Artificial (IA).</p>
+        </li>
+        <br>
+        <li>
+            <i class="fas fa-robot"></i>
+            <p><strong>Automatização:</strong> A maior parte dos jogos foi desenvolvida com pelo menos 80% de sua produção automatizada por ferramentas de IA.</p>
+        </li>
+        <br>
+        <li>
+            <i class="fas fa-tools"></i>
+            <p><strong>Tecnologias:</strong> As principais tecnologias utilizadas incluem o <strong>ChatGPT-4</strong> para geração de conteúdo, o <strong>Photoshop AI</strong> para criação de gráficos, e o <strong>Ideogram.ai</strong> para design visual.</p>
+        </li>
+        <br>
+        <li>
+            <i class="fas fa-gamepad"></i>
+            <p><strong>Desenvolvimento de Jogos:</strong> Todos os jogos foram desenvolvidos utilizando a biblioteca <strong>Phaser</strong>, uma poderosa ferramenta para desenvolvimento de jogos 2D baseados em HTML5.</p>
+        </li>
+        <br>
+        <li>
+            <i class="fas fa-server"></i>
+            <p><strong>Ranking:</strong> O sistema de ranking dos jogadores foi implementado utilizando <strong>Node.js</strong> para o backend, garantindo uma experiência fluida e em tempo real.</p>
+        </li>
+    </ul>
+    <br>
+    <hr>
+    <ul>
+        <li>
+            <i class="fas fa-lightbulb"></i>
+            <p><strong>Conclusão:</strong> Este projeto destaca o potencial das soluções de IA no processo criativo e técnico, facilitando o desenvolvimento de jogos com qualidade e eficiência.</p>
+        </li>
+    </ul>
+    <br><br>
+    <ul>
+        <li>
+            O projeto é open source e o código pode ser encontrado em: <a>https://github.com/BrunoFMPassos/game-ai</a>
+        </li>
+    </ul>
+  </div>
+
+  <!-- Título -->
+  <h1 class="text-4xl md:text-6xl font-bold mb-10">Bem-vindo ao AI Game Experience</h1>
+
+  <!-- Cards -->
+  <div class="flex flex-col md:flex-row gap-6">
+    <a href="/game-AI/BomberNauta/AstronautFinal.html" class="bg-purple-700 hover:bg-purple-900 transition-colors duration-300 rounded-lg shadow-lg p-10 text-center w-72 md:w-96 cursor-pointer">
+      <img src="/game-AI/BomberNauta/images/bombernauta.jpg" alt="BomberNauta" class="card-image mb-4 mx-auto">
+      <h2 class="text-2xl font-semibold mb-4">BomberNauta</h2>
+      <p class="text-lg">Aventure-se em missões épicas no espaço!</p>
+    </a>
+
+    <a href="/game-AI/Chicken/chickenNew.html" class="bg-purple-700 hover:bg-purple-900 transition-colors duration-300 rounded-lg shadow-lg p-10 text-center w-72 md:w-96 cursor-pointer">
+      <img src="/game-AI/Chicken/images/background.png" alt="Chicken" class="card-image mb-4 mx-auto">
+      <h2 class="text-2xl font-semibold mb-4">Chicken</h2>
+      <p class="text-lg">Ajude o frango a escapar de desafios incríveis!</p>
+    </a>
+  </div>
+
+  <script>
+    // Selecionar o cursor personalizado
+    const customCursor = document.getElementById("custom-cursor");
+
+    document.addEventListener("mousemove", function(e) {
+      // Atualizar posição do cursor (bolinha)
+      customCursor.style.left = `${e.clientX}px`;
+      customCursor.style.top = `${e.clientY}px`;
+
+      // Criar pequenos segmentos de "trilha" neon que seguem o cursor
+      const trail = document.createElement('div');
+      trail.classList.add('neon-trail');
+      trail.style.left = `${e.clientX}px`;
+      trail.style.top = `${e.clientY}px`;
+
+      document.body.appendChild(trail);
+
+      // Remover o segmento após a animação
+      setTimeout(() => {
+        trail.remove();
+      }, 800);
+    });
+
+    // Mostrar e ocultar modal explicativa ao passar o mouse na interrogação
+    const helpIcon = document.getElementById("help-icon");
+    const helpModal = document.getElementById("help-modal");
+
+    helpIcon.addEventListener("mouseenter", function() {
+      helpModal.classList.add("show");
+    });
+
+    helpIcon.addEventListener("mouseleave", function() {
+      helpModal.classList.remove("show");
+    });
+
+    helpModal.addEventListener("mouseleave", function() {
+      helpModal.classList.remove("show");
+    });
+  </script>
+</body>
+</html>
